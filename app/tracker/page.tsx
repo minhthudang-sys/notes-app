@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import {
+  Folder,
+  FolderTab,
+  MetadataLabel,
+  PaperPanel,
+  StatusStamp,
+  PART_STATUSES,
+  TEACH_BACK_STATUSES,
+  type StatusSet,
+} from "@/components/archive";
+import { folderColorForSprint } from "@/lib/design/folder-colors";
 import {
   createPart,
   createSprint,
@@ -28,17 +33,26 @@ import {
   type Sprint,
   type Todo,
 } from "@/lib/supabase/tracker";
-import { createNoteForPart, getNotesForParts } from "@/lib/supabase/notes";
+import {
+  createNoteForPart,
+  getNoteByPartId,
+  getNotesForParts,
+  type Note,
+} from "@/lib/supabase/notes";
 
-const selectClassName = cn(
-  "flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-);
+/**
+ * "Which sprint am I in" is a *derived* view concern, not a stored
+ * status — so it gets its own status set rather than a new column.
+ * Demonstrates StatusStamp accepting an arbitrary set.
+ */
+const SPRINT_FOCUS_STATUSES = {
+  current: { label: "Current", tone: "active", glyph: "◆" },
+  complete: { label: "All filed", tone: "filed", glyph: "✓" },
+} as const satisfies StatusSet<"current" | "complete">;
 
 type PartDraft = { name: string; date: string };
 
 export default function TrackerPage() {
-  const router = useRouter();
-
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -48,13 +62,18 @@ export default function TrackerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [openSprintId, setOpenSprintId] = useState<string | null>(null);
+  const [openPartId, setOpenPartId] = useState<string | null>(null);
+  const [openNote, setOpenNote] = useState<Note | null>(null);
+  const [noteLoading, setNoteLoading] = useState(false);
+
+  const [showSprintForm, setShowSprintForm] = useState(false);
   const [newSprintName, setNewSprintName] = useState("");
   const [newSprintStart, setNewSprintStart] = useState("");
   const [newSprintEnd, setNewSprintEnd] = useState("");
-
-  const [newPartDrafts, setNewPartDrafts] = useState<
-    Record<string, PartDraft>
-  >({});
+  const [newPartDrafts, setNewPartDrafts] = useState<Record<string, PartDraft>>(
+    {},
+  );
 
   const [newTodoText, setNewTodoText] = useState("");
   const [newTodoDue, setNewTodoDue] = useState("");
@@ -79,6 +98,57 @@ export default function TrackerPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  /**
+   * The current sprint is derived from existing data: the first
+   * sprint (in planned order) that still has an open part. No new
+   * database status was introduced for the visual design.
+   */
+  const currentSprintId = useMemo(() => {
+    const withOpen = sprints.find((s) =>
+      parts.some((p) => p.sprint_id === s.id && p.status === "open"),
+    );
+    return withOpen?.id ?? null;
+  }, [sprints, parts]);
+
+  /** The next thing to work on: first open part of the current sprint. */
+  const nextPart = useMemo(
+    () =>
+      parts.find(
+        (p) => p.sprint_id === currentSprintId && p.status === "open",
+      ) ?? null,
+    [parts, currentSprintId],
+  );
+
+  // Open the current sprint by default, once data has loaded.
+  useEffect(() => {
+    if (openSprintId === null && currentSprintId) {
+      setOpenSprintId(currentSprintId);
+    }
+  }, [currentSprintId, openSprintId]);
+
+  // Load the summary note whenever a chapter case file is opened.
+  useEffect(() => {
+    if (!openPartId) {
+      setOpenNote(null);
+      return;
+    }
+    let cancelled = false;
+    setNoteLoading(true);
+    getNoteByPartId(openPartId)
+      .then((note) => {
+        if (!cancelled) setOpenNote(note);
+      })
+      .catch((err) => !cancelled && setError(err.message))
+      .finally(() => !cancelled && setNoteLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [openPartId]);
+
+  function partsOf(sprintId: string) {
+    return parts.filter((p) => p.sprint_id === sprintId);
+  }
+
   async function handleCreateSprint(e: React.FormEvent) {
     e.preventDefault();
     if (!newSprintName.trim()) return;
@@ -92,6 +162,7 @@ export default function TrackerPage() {
       setNewSprintName("");
       setNewSprintStart("");
       setNewSprintEnd("");
+      setShowSprintForm(false);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -131,10 +202,7 @@ export default function TrackerPage() {
   async function handleToggleStatus(part: Part) {
     setError(null);
     try {
-      const updated = await setPartStatus(
-        part.id,
-        part.status !== "completed",
-      );
+      const updated = await setPartStatus(part.id, part.status !== "completed");
       setParts((prev) => prev.map((p) => (p.id === part.id ? updated : p)));
     } catch (err) {
       setError((err as Error).message);
@@ -151,17 +219,15 @@ export default function TrackerPage() {
     }
   }
 
+  /** Creates the summary note if absent, then opens the case file. */
   async function handleOpenSummary(part: Part) {
-    const existingNoteId = notesByPart.get(part.id);
-    if (existingNoteId) {
-      router.push(`/notes?partId=${part.id}`);
-      return;
-    }
     setError(null);
+    setOpenPartId(part.id);
+    if (notesByPart.has(part.id)) return;
     try {
       const note = await createNoteForPart(part.id, part.name);
       setNotesByPart((prev) => new Map(prev).set(part.id, note.id));
-      router.push(`/notes?partId=${part.id}`);
+      setOpenNote(note);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -205,261 +271,642 @@ export default function TrackerPage() {
     }
   }
 
+  const totalParts = parts.length;
+  const totalCompleted = parts.filter((p) => p.status === "completed").length;
+  const currentSprint = sprints.find((s) => s.id === currentSprintId) ?? null;
+
   return (
-    <div className="flex-1 w-full flex flex-col gap-8 max-w-3xl mx-auto p-5">
-      <h1 className="font-bold text-2xl">Study Tracker</h1>
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <header className="mb-8">
+        <p className="font-mono text-[11px] uppercase tracking-label text-archive-dim">
+          Study archive
+        </p>
+        <h1 className="mt-2 font-display text-3xl uppercase tracking-tight text-archive-bright sm:text-5xl">
+          Sprint Folders
+        </h1>
+      </header>
 
       {error && (
-        <p className="text-sm text-destructive-foreground bg-destructive/10 border border-destructive/50 rounded-md p-3">
+        <p
+          role="alert"
+          className="mb-6 border border-destructive/60 bg-destructive/15 p-3 font-mono text-xs text-archive-bright"
+        >
           {error}
         </p>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">New sprint</CardTitle>
-        </CardHeader>
-        <form onSubmit={handleCreateSprint}>
-          <CardContent className="flex flex-wrap gap-4 items-end">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-sprint-name">Name</Label>
-              <Input
-                id="new-sprint-name"
-                value={newSprintName}
-                onChange={(e) => setNewSprintName(e.target.value)}
-                placeholder="Sprint name"
-              />
+      {/* Answers "what should I work on next?" and "what have I completed?" */}
+      {!loading && (
+        <PaperPanel edge="left" tooth className="mb-8 p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <span className="font-mono text-[10px] uppercase tracking-label text-ink-soft">
+                Up next
+              </span>
+              {nextPart && currentSprint ? (
+                <>
+                  <h2 className="mt-1 font-display text-lg uppercase leading-tight sm:text-2xl">
+                    {nextPart.name}
+                  </h2>
+                  <p className="mt-1 font-mono text-[11px] text-ink-soft">
+                    {currentSprint.name}
+                  </p>
+                </>
+              ) : (
+                <h2 className="mt-1 font-display text-lg uppercase sm:text-2xl">
+                  Nothing open
+                </h2>
+              )}
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-sprint-start">Planned start</Label>
-              <Input
-                id="new-sprint-start"
-                type="date"
-                value={newSprintStart}
-                onChange={(e) => setNewSprintStart(e.target.value)}
+
+            <div className="flex flex-wrap items-center gap-5">
+              <MetadataLabel
+                surface="paper"
+                label="Deadline"
+                value={currentSprint?.planned_end}
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-sprint-end">Planned end</Label>
-              <Input
-                id="new-sprint-end"
-                type="date"
-                value={newSprintEnd}
-                onChange={(e) => setNewSprintEnd(e.target.value)}
+              <MetadataLabel
+                surface="paper"
+                label="Chapters filed"
+                value={`${totalCompleted}/${totalParts}`}
               />
+              {nextPart && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setOpenSprintId(nextPart.sprint_id);
+                    setOpenPartId(nextPart.id);
+                  }}
+                >
+                  Go to chapter
+                </Button>
+              )}
             </div>
-            <Button type="submit" variant="outline">
-              Add sprint
-            </Button>
-          </CardContent>
-        </form>
-      </Card>
+          </div>
+        </PaperPanel>
+      )}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="font-mono text-xs text-archive-dim">Opening archive…</p>
       ) : sprints.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No sprints yet.</p>
+        <p className="font-mono text-xs text-archive-dim">
+          No sprints filed yet.
+        </p>
       ) : (
-        <div className="flex flex-col gap-6">
-          {sprints.map((sprint) => {
-            const sprintParts = parts.filter(
-              (p) => p.sprint_id === sprint.id,
-            );
-            const draft = getDraft(sprint.id);
-            return (
-              <Card key={sprint.id}>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    {sprint.name}
-                    {(sprint.planned_start || sprint.planned_end) && (
-                      <span className="text-sm font-normal text-muted-foreground ml-2">
-                        {sprint.planned_start ?? "?"} –{" "}
-                        {sprint.planned_end ?? "?"}
-                      </span>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  {sprintParts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No parts yet.
-                    </p>
-                  ) : (
-                    <div className="flex flex-col gap-3">
-                      {sprintParts.map((part) => (
-                        <div
-                          key={part.id}
-                          className="flex flex-col gap-1.5 border rounded-md p-3"
-                        >
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <label className="flex items-center gap-1.5 text-sm font-medium">
-                              <input
-                                type="checkbox"
-                                checked={part.status === "completed"}
-                                onChange={() => handleToggleStatus(part)}
-                              />
-                              {part.name}
-                            </label>
-                            <span className="text-xs text-muted-foreground">
-                              ({part.status})
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Planned: {part.planned_completion_date ?? "—"}{" "}
-                            &nbsp;|&nbsp; Actual:{" "}
-                            {part.actual_completion_date ?? "—"}
-                          </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <label className="flex items-center gap-1.5 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={part.teach_back_done}
-                                onChange={() => handleToggleTeachBack(part)}
-                              />
-                              Teach-back done
-                            </label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenSummary(part)}
-                            >
-                              {notesByPart.has(part.id)
-                                ? "Open chapter summary"
-                                : "Create chapter summary"}
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+        /* Layered folder stack on desktop; plain accordion on mobile. */
+        <div className="flex flex-col">
+          {sprints.map((sprint, index) => {
+            const sprintParts = partsOf(sprint.id);
+            const done = sprintParts.filter(
+              (p) => p.status === "completed",
+            ).length;
+            const isOpen = openSprintId === sprint.id;
+            const isCurrent = sprint.id === currentSprintId;
+            const previousOpen = sprints[index - 1]?.id === openSprintId;
+            const contentId = `folder-${sprint.id}`;
 
+            return (
+              <div
+                key={sprint.id}
+                className={cn(
+                  index > 0 &&
+                    (isOpen || previousOpen ? "mt-5" : "-mt-1 sm:-mt-2"),
+                )}
+              >
+                <Folder
+                  color={folderColorForSprint(sprint)}
+                  state={isOpen ? "open" : isCurrent ? "closed" : "behind"}
+                  label={sprint.name}
+                  contentId={contentId}
+                  tab={
+                    <FolderTab
+                      label={sprint.name}
+                      active={isOpen}
+                      controls={contentId}
+                      expanded={isOpen}
+                      meta={`${done}/${sprintParts.length}`}
+                      onClick={() => {
+                        setOpenSprintId(isOpen ? null : sprint.id);
+                        setOpenPartId(null);
+                      }}
+                      className="max-w-full sm:max-w-[26rem]"
+                    />
+                  }
+                  meta={
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                      <ProgressTicks total={sprintParts.length} done={done} />
+                      <MetadataLabel
+                        layout="inline"
+                        label="Due"
+                        value={sprint.planned_end}
+                      />
+                      {isCurrent && (
+                        <StatusStamp
+                          status="current"
+                          statuses={SPRINT_FOCUS_STATUSES}
+                        />
+                      )}
+                    </div>
+                  }
+                >
+                  <ChapterRail
+                    parts={sprintParts}
+                    openPartId={openPartId}
+                    notesByPart={notesByPart}
+                    onSelect={(id) =>
+                      setOpenPartId(id === openPartId ? null : id)
+                    }
+                  />
+
+                  {openPartId &&
+                    sprintParts.some((p) => p.id === openPartId) && (
+                      <CaseFile
+                        part={sprintParts.find((p) => p.id === openPartId)!}
+                        note={openNote}
+                        noteLoading={noteLoading}
+                        hasNote={notesByPart.has(openPartId)}
+                        onToggleStatus={handleToggleStatus}
+                        onToggleTeachBack={handleToggleTeachBack}
+                        onOpenSummary={handleOpenSummary}
+                      />
+                    )}
+
+                  {/* File a new chapter into this sprint */}
                   <form
                     onSubmit={(e) => handleCreatePart(sprint.id, e)}
-                    className="flex flex-wrap gap-2 items-end"
+                    className="mt-4 flex flex-wrap items-end gap-2 border-t border-archive-rule pt-4"
                   >
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor={`new-part-name-${sprint.id}`}>
-                        New part
+                    <div className="flex flex-col gap-1.5">
+                      <Label
+                        htmlFor={`new-part-name-${sprint.id}`}
+                        className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
+                      >
+                        New chapter
                       </Label>
                       <Input
                         id={`new-part-name-${sprint.id}`}
-                        value={draft.name}
+                        value={getDraft(sprint.id).name}
                         onChange={(e) =>
                           updateDraft(sprint.id, { name: e.target.value })
                         }
-                        placeholder="Part name"
+                        placeholder="Chapter name"
+                        className="w-56 font-mono text-xs"
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor={`new-part-date-${sprint.id}`}>
-                        Planned completion
+                    <div className="flex flex-col gap-1.5">
+                      <Label
+                        htmlFor={`new-part-date-${sprint.id}`}
+                        className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
+                      >
+                        Planned
                       </Label>
                       <Input
                         id={`new-part-date-${sprint.id}`}
                         type="date"
-                        value={draft.date}
+                        value={getDraft(sprint.id).date}
                         onChange={(e) =>
                           updateDraft(sprint.id, { date: e.target.value })
                         }
+                        className="font-mono text-xs"
                       />
                     </div>
                     <Button type="submit" variant="outline" size="sm">
-                      Add part
+                      File chapter
                     </Button>
                   </form>
-                </CardContent>
-              </Card>
+                </Folder>
+              </div>
             );
           })}
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Todos</CardTitle>
-        </CardHeader>
-        <form onSubmit={handleCreateTodo}>
-          <CardContent className="flex flex-wrap gap-4 items-end">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-todo-text">Text</Label>
+      {/* New sprint */}
+      <div className="mt-8">
+        {showSprintForm ? (
+          <form
+            onSubmit={handleCreateSprint}
+            className="flex flex-wrap items-end gap-3 border border-archive-rule bg-archive-raised p-4"
+          >
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor="new-sprint-name"
+                className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
+              >
+                Sprint name
+              </Label>
               <Input
-                id="new-todo-text"
-                value={newTodoText}
-                onChange={(e) => setNewTodoText(e.target.value)}
-                placeholder="What needs doing?"
+                id="new-sprint-name"
+                value={newSprintName}
+                onChange={(e) => setNewSprintName(e.target.value)}
+                placeholder="Sprint name"
+                className="w-64 font-mono text-xs"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-todo-due">Due date</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor="new-sprint-start"
+                className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
+              >
+                Planned start
+              </Label>
               <Input
-                id="new-todo-due"
+                id="new-sprint-start"
                 type="date"
-                value={newTodoDue}
-                onChange={(e) => setNewTodoDue(e.target.value)}
+                value={newSprintStart}
+                onChange={(e) => setNewSprintStart(e.target.value)}
+                className="font-mono text-xs"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-todo-priority">Priority</Label>
-              <select
-                id="new-todo-priority"
-                className={selectClassName}
-                value={newTodoPriority}
-                onChange={(e) => setNewTodoPriority(e.target.value)}
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor="new-sprint-end"
+                className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
               >
-                <option value="">—</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
+                Planned end
+              </Label>
+              <Input
+                id="new-sprint-end"
+                type="date"
+                value={newSprintEnd}
+                onChange={(e) => setNewSprintEnd(e.target.value)}
+                className="font-mono text-xs"
+              />
             </div>
-            <Button type="submit" variant="outline">
-              Add todo
+            <Button type="submit" size="sm">
+              Add sprint
             </Button>
-          </CardContent>
-        </form>
-        <CardFooter className="flex flex-col items-stretch gap-2">
-          {todos.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No todos yet.</p>
-          ) : (
-            todos.map((todo) => (
-              <div
-                key={todo.id}
-                className="flex items-center gap-2 justify-between border rounded-md p-2"
-              >
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={todo.done}
-                    onChange={() => handleToggleTodo(todo)}
-                  />
-                  <span className={todo.done ? "line-through" : ""}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSprintForm(false)}
+            >
+              Cancel
+            </Button>
+          </form>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSprintForm(true)}
+          >
+            + New sprint folder
+          </Button>
+        )}
+      </div>
+
+      <TodoDrawer
+        todos={todos}
+        text={newTodoText}
+        due={newTodoDue}
+        priority={newTodoPriority}
+        onText={setNewTodoText}
+        onDue={setNewTodoDue}
+        onPriority={setNewTodoPriority}
+        onSubmit={handleCreateTodo}
+        onToggle={handleToggleTodo}
+        onDelete={handleDeleteTodo}
+      />
+    </main>
+  );
+}
+
+/** Compact per-chapter progress. Paired with a text count, never colour alone. */
+function ProgressTicks({ total, done }: { total: number; done: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className="flex gap-[3px]"
+        role="img"
+        aria-label={`${done} of ${total} chapters completed`}
+      >
+        {Array.from({ length: total }).map((_, i) => (
+          <span
+            key={i}
+            className={cn(
+              "h-2.5 w-1.5",
+              i < done ? "bg-folder-current" : "bg-archive-rule",
+            )}
+          />
+        ))}
+      </div>
+      <span className="font-mono text-[10px] tabular-nums text-archive-dim">
+        {done}/{total}
+      </span>
+    </div>
+  );
+}
+
+/** The chapter documents filed inside an open sprint folder. */
+function ChapterRail({
+  parts,
+  openPartId,
+  notesByPart,
+  onSelect,
+}: {
+  parts: Part[];
+  openPartId: string | null;
+  notesByPart: Map<string, string>;
+  onSelect: (id: string) => void;
+}) {
+  if (parts.length === 0) {
+    return (
+      <p className="font-mono text-xs text-archive-dim">
+        No chapters filed in this folder yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5 border-b border-archive-rule pb-0">
+      {parts.map((part) => (
+        <FolderTab
+          key={part.id}
+          size="chapter"
+          label={part.name}
+          active={openPartId === part.id}
+          expanded={openPartId === part.id}
+          leading={part.status === "completed" ? "✓" : "○"}
+          meta={notesByPart.has(part.id) ? "▤" : undefined}
+          onClick={() => onSelect(part.id)}
+          className="max-w-[15rem]"
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * An opened chapter: metadata rail on one side, the filed summary
+ * note's prose on the other.
+ */
+function CaseFile({
+  part,
+  note,
+  noteLoading,
+  hasNote,
+  onToggleStatus,
+  onToggleTeachBack,
+  onOpenSummary,
+}: {
+  part: Part;
+  note: Note | null;
+  noteLoading: boolean;
+  hasNote: boolean;
+  onToggleStatus: (part: Part) => void;
+  onToggleTeachBack: (part: Part) => void;
+  onOpenSummary: (part: Part) => void;
+}) {
+  const isOpenStatus = part.status === "open";
+
+  return (
+    <PaperPanel
+      as="article"
+      edge="left"
+      tooth
+      className="mt-4 grid gap-6 p-4 sm:p-6 md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]"
+    >
+      {/* Metadata rail */}
+      <div className="flex flex-col gap-4 md:border-r md:border-paper-edge md:pr-5">
+        <div className="flex flex-wrap gap-2">
+          <StatusStamp
+            surface="paper"
+            status={part.status}
+            statuses={PART_STATUSES}
+          />
+          <StatusStamp
+            surface="paper"
+            status={part.teach_back_done ? "done" : "pending"}
+            statuses={TEACH_BACK_STATUSES}
+          />
+        </div>
+
+        <MetadataLabel
+          surface="paper"
+          label="Planned"
+          value={part.planned_completion_date}
+        />
+        <MetadataLabel
+          surface="paper"
+          label="Completed"
+          value={part.actual_completion_date}
+        />
+        <MetadataLabel
+          surface="paper"
+          label="Summary note"
+          value={hasNote ? "Filed" : "None"}
+        />
+
+        <div className="flex flex-col gap-2 pt-1">
+          {/*
+           * Primary action reflects the chapter's state, but the
+           * summary is always reachable: a summary can be drafted
+           * while the chapter is still open, independently of both
+           * completion and teach-back.
+           */}
+          {isOpenStatus && (
+            <Button size="sm" onClick={() => onToggleStatus(part)}>
+              Mark completed
+            </Button>
+          )}
+
+          <Button
+            size="sm"
+            variant={isOpenStatus ? "outline" : "default"}
+            onClick={() => onOpenSummary(part)}
+          >
+            {hasNote ? "Open summary" : "Start Teach-Back"}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onToggleTeachBack(part)}
+          >
+            {part.teach_back_done ? "Undo teach-back" : "Mark taught back"}
+          </Button>
+
+          {!isOpenStatus && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onToggleStatus(part)}
+            >
+              Reopen chapter
+            </Button>
+          )}
+
+          {hasNote && (
+            <Link
+              href={`/notes?partId=${part.id}`}
+              className="no-paper-link font-mono text-[11px] uppercase tracking-label text-ink underline underline-offset-4"
+            >
+              Edit in index →
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* The filed paper itself */}
+      <div className="min-w-0">
+        <h3 className="font-display text-2xl uppercase leading-tight sm:text-3xl">
+          {part.name}
+        </h3>
+
+        {noteLoading ? (
+          <p className="mt-4 font-mono text-xs text-ink-soft">
+            Retrieving filed paper…
+          </p>
+        ) : note && note.body.trim() ? (
+          <div className="paper-prose has-dropcap mt-4 whitespace-pre-wrap text-[15px]">
+            {note.body}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm italic text-ink-soft">
+            {hasNote
+              ? "This summary is filed but still blank."
+              : "No summary filed for this chapter yet."}
+          </p>
+        )}
+      </div>
+    </PaperPanel>
+  );
+}
+
+/** Practical metadata: todos and their due dates. */
+function TodoDrawer({
+  todos,
+  text,
+  due,
+  priority,
+  onText,
+  onDue,
+  onPriority,
+  onSubmit,
+  onToggle,
+  onDelete,
+}: {
+  todos: Todo[];
+  text: string;
+  due: string;
+  priority: string;
+  onText: (v: string) => void;
+  onDue: (v: string) => void;
+  onPriority: (v: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onToggle: (todo: Todo) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <section className="mt-12" aria-label="Todos">
+      <h2 className="font-display text-lg uppercase tracking-label text-archive-bright">
+        Pinned todos
+      </h2>
+
+      <form
+        onSubmit={onSubmit}
+        className="mt-3 flex flex-wrap items-end gap-3 border border-archive-rule bg-archive-raised p-4"
+      >
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor="new-todo-text"
+            className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
+          >
+            Task
+          </Label>
+          <Input
+            id="new-todo-text"
+            value={text}
+            onChange={(e) => onText(e.target.value)}
+            placeholder="What needs doing?"
+            className="w-64 font-mono text-xs"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor="new-todo-due"
+            className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
+          >
+            Due
+          </Label>
+          <Input
+            id="new-todo-due"
+            type="date"
+            value={due}
+            onChange={(e) => onDue(e.target.value)}
+            className="font-mono text-xs"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor="new-todo-priority"
+            className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
+          >
+            Priority
+          </Label>
+          <select
+            id="new-todo-priority"
+            value={priority}
+            onChange={(e) => onPriority(e.target.value)}
+            className="h-9 border border-input bg-transparent px-3 font-mono text-xs text-archive-bright"
+          >
+            <option value="">—</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <Button type="submit" variant="outline" size="sm">
+          Pin todo
+        </Button>
+      </form>
+
+      {todos.length === 0 ? (
+        <p className="mt-3 font-mono text-xs text-archive-dim">
+          Nothing pinned.
+        </p>
+      ) : (
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {todos.map((todo) => (
+            <PaperPanel
+              key={todo.id}
+              as="li"
+              tone={todo.done ? "shade" : "paper"}
+              className="flex items-start justify-between gap-3 p-3"
+            >
+              <label className="flex min-w-0 items-start gap-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={todo.done}
+                  onChange={() => onToggle(todo)}
+                  className="mt-1 shrink-0"
+                />
+                <span className="min-w-0">
+                  <span className={cn(todo.done && "line-through opacity-70")}>
                     {todo.text}
                   </span>
-                  {todo.due_date && (
-                    <span className="text-xs text-muted-foreground">
-                      due {todo.due_date}
+                  {(todo.due_date || todo.priority) && (
+                    <span className="mt-1 block font-mono text-[10px] uppercase tracking-label text-ink-soft">
+                      {todo.due_date ? `Due ${todo.due_date}` : ""}
+                      {todo.due_date && todo.priority ? " · " : ""}
+                      {todo.priority ?? ""}
                     </span>
                   )}
-                  {todo.priority && (
-                    <span className="text-xs text-muted-foreground">
-                      [{todo.priority}]
-                    </span>
-                  )}
-                </label>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleDeleteTodo(todo.id)}
-                >
-                  Delete
-                </Button>
-              </div>
-            ))
-          )}
-        </CardFooter>
-      </Card>
-    </div>
+                </span>
+              </label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDelete(todo.id)}
+                className="shrink-0 text-ink-soft hover:bg-ink/10 hover:text-ink"
+              >
+                Delete
+              </Button>
+            </PaperPanel>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

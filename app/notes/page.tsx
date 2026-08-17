@@ -1,19 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { MetadataLabel, PaperPanel } from "@/components/archive";
+import { folderColorForSprint } from "@/lib/design/folder-colors";
 import {
   createCollection,
   createNote,
@@ -36,13 +31,14 @@ import {
   type Sprint,
 } from "@/lib/supabase/tracker";
 
-const textareaClassName = cn(
-  "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-);
+const fieldClassName =
+  "flex h-9 w-full border border-input bg-transparent px-3 py-1 font-mono text-xs text-archive-bright shadow-sm transition-colors placeholder:text-archive-dim focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
-const selectClassName = cn(
-  "flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-);
+const paperFieldClassName =
+  "flex w-full border border-paper-edge bg-paper-shade px-3 py-2 text-sm text-ink shadow-sm placeholder:text-ink-soft focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+const captionClassName =
+  "font-mono text-[10px] uppercase tracking-label text-archive-dim";
 
 function toggleId(ids: string[], id: string): string[] {
   return ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id];
@@ -91,6 +87,18 @@ function NotesPageContent() {
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
 
+  /** part_id -> { part, sprint } so a filed note can show its chapter. */
+  const filedIn = useMemo(() => {
+    const map = new Map<string, { part: Part; sprint: Sprint | undefined }>();
+    for (const part of parts) {
+      map.set(part.id, {
+        part,
+        sprint: sprints.find((s) => s.id === part.sprint_id),
+      });
+    }
+    return map;
+  }, [parts, sprints]);
+
   async function loadNotes() {
     setError(null);
     try {
@@ -134,7 +142,13 @@ function NotesPageContent() {
   useEffect(() => {
     loadNotes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterCollectionId, filterTagId, appliedSearch, filterSprintId, filterPartId]);
+  }, [
+    filterCollectionId,
+    filterTagId,
+    appliedSearch,
+    filterSprintId,
+    filterPartId,
+  ]);
 
   async function handleCreateCollection(e: React.FormEvent) {
     e.preventDefault();
@@ -240,351 +254,453 @@ function NotesPageContent() {
   }
 
   return (
-    <div className="flex-1 w-full flex flex-col gap-8 max-w-3xl mx-auto p-5">
-      <h1 className="font-bold text-2xl">Notes</h1>
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <header className="mb-8">
+        <p className={captionClassName}>Study archive</p>
+        <h1 className="mt-2 font-display text-3xl uppercase tracking-tight text-archive-bright sm:text-5xl">
+          Note Index
+        </h1>
+      </header>
 
       {error && (
-        <p className="text-sm text-destructive-foreground bg-destructive/10 border border-destructive/50 rounded-md p-3">
+        <p
+          role="alert"
+          className="mb-6 border border-destructive/60 bg-destructive/15 p-3 font-mono text-xs text-archive-bright"
+        >
           {error}
         </p>
       )}
 
-      <div className="flex flex-wrap gap-6">
+      {/* Index card catalogue: filters + search */}
+      <section
+        aria-label="Index filters"
+        className="border border-archive-rule bg-archive-raised p-4"
+      >
         <form
-          onSubmit={handleCreateCollection}
-          className="flex gap-2 items-end"
+          onSubmit={handleSearchSubmit}
+          className="flex flex-wrap items-end gap-2"
         >
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="new-collection">New collection</Label>
-            <Input
-              id="new-collection"
-              value={newCollectionName}
-              onChange={(e) => setNewCollectionName(e.target.value)}
-              placeholder="Collection name"
-            />
-          </div>
-          <Button type="submit" variant="outline">
-            Add
-          </Button>
-        </form>
-
-        <form onSubmit={handleCreateTag} className="flex gap-2 items-end">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="new-tag">New tag</Label>
-            <Input
-              id="new-tag"
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
-              placeholder="Tag name"
-            />
-          </div>
-          <Button type="submit" variant="outline">
-            Add
-          </Button>
-        </form>
-      </div>
-
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="filter-collection">Collection</Label>
-          <select
-            id="filter-collection"
-            className={selectClassName}
-            value={filterCollectionId}
-            onChange={(e) => setFilterCollectionId(e.target.value)}
-          >
-            <option value="">All collections</option>
-            {collections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="filter-tag">Tag</Label>
-          <select
-            id="filter-tag"
-            className={selectClassName}
-            value={filterTagId}
-            onChange={(e) => setFilterTagId(e.target.value)}
-          >
-            <option value="">All tags</option>
-            {tags.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="filter-sprint">Sprint</Label>
-          <select
-            id="filter-sprint"
-            className={selectClassName}
-            value={filterSprintId}
-            onChange={(e) => {
-              setFilterSprintId(e.target.value);
-              setFilterPartId("");
-            }}
-          >
-            <option value="">All sprints</option>
-            {sprints.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="filter-part">Part</Label>
-          <select
-            id="filter-part"
-            className={selectClassName}
-            value={filterPartId}
-            onChange={(e) => {
-              setFilterPartId(e.target.value);
-              setFilterSprintId("");
-            }}
-          >
-            <option value="">All parts</option>
-            {parts.map((p) => (
-              <option key={p.id} value={p.id}>
-                {sprints.find((s) => s.id === p.sprint_id)?.name ?? "?"} —{" "}
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <form onSubmit={handleSearchSubmit} className="flex gap-2 items-end">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="search">Search</Label>
+          <div className="flex min-w-[12rem] flex-1 flex-col gap-1.5">
+            <Label htmlFor="search" className={captionClassName}>
+              Search the index
+            </Label>
             <Input
               id="search"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search title & body..."
+              placeholder="Title & body full-text…"
+              className={fieldClassName}
             />
           </div>
-          <Button type="submit" variant="outline">
+          <Button type="submit" variant="outline" size="sm">
             Search
           </Button>
           {appliedSearch && (
-            <Button type="button" variant="ghost" onClick={clearSearch}>
+            <Button type="button" variant="ghost" size="sm" onClick={clearSearch}>
               Clear
             </Button>
           )}
         </form>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">New note</CardTitle>
-        </CardHeader>
-        <form onSubmit={handleCreate}>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-title">Title</Label>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="filter-collection" className={captionClassName}>
+              Divider
+            </Label>
+            <select
+              id="filter-collection"
+              className={fieldClassName}
+              value={filterCollectionId}
+              onChange={(e) => setFilterCollectionId(e.target.value)}
+            >
+              <option value="">All collections</option>
+              {collections.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="filter-tag" className={captionClassName}>
+              Label
+            </Label>
+            <select
+              id="filter-tag"
+              className={fieldClassName}
+              value={filterTagId}
+              onChange={(e) => setFilterTagId(e.target.value)}
+            >
+              <option value="">All tags</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="filter-sprint" className={captionClassName}>
+              Sprint folder
+            </Label>
+            <select
+              id="filter-sprint"
+              className={fieldClassName}
+              value={filterSprintId}
+              onChange={(e) => {
+                setFilterSprintId(e.target.value);
+                setFilterPartId("");
+              }}
+            >
+              <option value="">All sprints</option>
+              {sprints.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="filter-part" className={captionClassName}>
+              Chapter
+            </Label>
+            <select
+              id="filter-part"
+              className={fieldClassName}
+              value={filterPartId}
+              onChange={(e) => {
+                setFilterPartId(e.target.value);
+                setFilterSprintId("");
+              }}
+            >
+              <option value="">All chapters</option>
+              {parts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {sprints.find((s) => s.id === p.sprint_id)?.name ?? "?"} —{" "}
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* New divider / new label */}
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 border-t border-archive-rule pt-4">
+          <form onSubmit={handleCreateCollection} className="flex items-end gap-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="new-collection" className={captionClassName}>
+                New divider
+              </Label>
               <Input
-                id="new-title"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Title"
+                id="new-collection"
+                value={newCollectionName}
+                onChange={(e) => setNewCollectionName(e.target.value)}
+                placeholder="Collection name"
+                className={cn(fieldClassName, "w-48")}
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-body">Body</Label>
-              <textarea
-                id="new-body"
-                className={textareaClassName}
-                rows={4}
-                value={newBody}
-                onChange={(e) => setNewBody(e.target.value)}
-                placeholder="Write your note..."
-              />
-            </div>
-            {collections.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <Label>Collections</Label>
-                <div className="flex flex-wrap gap-3">
-                  {collections.map((c) => (
-                    <label
-                      key={c.id}
-                      className="flex items-center gap-1.5 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={newCollectionIds.includes(c.id)}
-                        onChange={() =>
-                          setNewCollectionIds((prev) => toggleId(prev, c.id))
-                        }
-                      />
-                      {c.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-            {tags.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <Label>Tags</Label>
-                <div className="flex flex-wrap gap-3">
-                  {tags.map((t) => (
-                    <label
-                      key={t.id}
-                      className="flex items-center gap-1.5 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={newTagIds.includes(t.id)}
-                        onChange={() =>
-                          setNewTagIds((prev) => toggleId(prev, t.id))
-                        }
-                      />
-                      {t.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" disabled={creating}>
-              {creating ? "Adding..." : "Add note"}
+            <Button type="submit" variant="outline" size="sm">
+              Add
             </Button>
-          </CardFooter>
-        </form>
-      </Card>
+          </form>
 
-      <div className="flex flex-col gap-4">
+          <form onSubmit={handleCreateTag} className="flex items-end gap-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="new-tag" className={captionClassName}>
+                New label
+              </Label>
+              <Input
+                id="new-tag"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="Tag name"
+                className={cn(fieldClassName, "w-40")}
+              />
+            </div>
+            <Button type="submit" variant="outline" size="sm">
+              Add
+            </Button>
+          </form>
+        </div>
+      </section>
+
+      {/* File a new paper */}
+      <PaperPanel edge="top" tooth className="mt-6 p-4 sm:p-5">
+        <h2 className="font-display text-lg uppercase tracking-label">
+          File a new note
+        </h2>
+        <form onSubmit={handleCreate} className="mt-3 flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label
+              htmlFor="new-title"
+              className="font-mono text-[10px] uppercase tracking-label text-ink-soft"
+            >
+              Title
+            </Label>
+            <Input
+              id="new-title"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="Title"
+              className={paperFieldClassName}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label
+              htmlFor="new-body"
+              className="font-mono text-[10px] uppercase tracking-label text-ink-soft"
+            >
+              Body
+            </Label>
+            <textarea
+              id="new-body"
+              rows={4}
+              value={newBody}
+              onChange={(e) => setNewBody(e.target.value)}
+              placeholder="Write your note…"
+              className={paperFieldClassName}
+            />
+          </div>
+
+          <FilingPickers
+            collections={collections}
+            tags={tags}
+            collectionIds={newCollectionIds}
+            tagIds={newTagIds}
+            onToggleCollection={(id) =>
+              setNewCollectionIds((prev) => toggleId(prev, id))
+            }
+            onToggleTag={(id) => setNewTagIds((prev) => toggleId(prev, id))}
+          />
+
+          <div>
+            <Button type="submit" disabled={creating} size="sm">
+              {creating ? "Filing…" : "File note"}
+            </Button>
+          </div>
+        </form>
+      </PaperPanel>
+
+      {/* The papers themselves */}
+      <section aria-label="Notes" className="mt-8">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-lg uppercase tracking-label text-archive-bright">
+            Filed papers
+          </h2>
+          <span className="font-mono text-[10px] uppercase tracking-label text-archive-dim">
+            {loading ? "…" : `${notes.length} shown`}
+          </span>
+        </div>
+
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading notes...</p>
+          <p className="font-mono text-xs text-archive-dim">Reading index…</p>
         ) : notes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No notes found.</p>
+          <p className="font-mono text-xs text-archive-dim">
+            No papers match this filter.
+          </p>
         ) : (
-          notes.map((note) => (
-            <Card key={note.id}>
-              {editingId === note.id ? (
-                <>
-                  <CardContent className="flex flex-col gap-4 pt-6">
-                    <Input
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      placeholder="Title"
-                    />
-                    <textarea
-                      className={textareaClassName}
-                      rows={4}
-                      value={editBody}
-                      onChange={(e) => setEditBody(e.target.value)}
-                      placeholder="Write your note..."
-                    />
-                    {collections.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        <Label>Collections</Label>
-                        <div className="flex flex-wrap gap-3">
-                          {collections.map((c) => (
-                            <label
+          <ul className="grid gap-4 md:grid-cols-2">
+            {notes.map((note) => {
+              const filing = note.part_id ? filedIn.get(note.part_id) : undefined;
+              const style = filing?.sprint
+                ? {
+                    "--folder-current": `var(--folder-${folderColorForSprint(filing.sprint)})`,
+                  }
+                : undefined;
+
+              return (
+                <PaperPanel
+                  as="li"
+                  key={note.id}
+                  edge={filing ? "left" : "none"}
+                  tooth
+                  className="flex flex-col gap-3 p-4"
+                  style={style as React.CSSProperties}
+                >
+                  {editingId === note.id ? (
+                    <>
+                      <Input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="Title"
+                        aria-label="Title"
+                        className={paperFieldClassName}
+                      />
+                      <textarea
+                        rows={5}
+                        value={editBody}
+                        onChange={(e) => setEditBody(e.target.value)}
+                        placeholder="Write your note…"
+                        aria-label="Body"
+                        className={paperFieldClassName}
+                      />
+                      <FilingPickers
+                        collections={collections}
+                        tags={tags}
+                        collectionIds={editCollectionIds}
+                        tagIds={editTagIds}
+                        onToggleCollection={(id) =>
+                          setEditCollectionIds((prev) => toggleId(prev, id))
+                        }
+                        onToggleTag={(id) =>
+                          setEditTagIds((prev) => toggleId(prev, id))
+                        }
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleUpdate(note.id)}>
+                          Save
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={cancelEditing}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {filing && (
+                        <p className="font-mono text-[10px] uppercase tracking-label text-ink-soft">
+                          <span className="mr-1.5" aria-hidden="true">
+                            ▤
+                          </span>
+                          Chapter summary · {filing.sprint?.name ?? "Sprint"} ·{" "}
+                          {filing.part.name}
+                        </p>
+                      )}
+
+                      <h3 className="font-display text-xl uppercase leading-tight">
+                        {note.title || "Untitled"}
+                      </h3>
+
+                      {note.body && (
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">
+                          {note.body}
+                        </p>
+                      )}
+
+                      {(note.collections.length > 0 ||
+                        note.tags.length > 0) && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {note.collections.map((c) => (
+                            <span
                               key={c.id}
-                              className="flex items-center gap-1.5 text-sm"
+                              className="border-l-4 border-l-ink/50 bg-paper-shade px-2 py-0.5 font-mono text-[10px] uppercase tracking-label text-ink"
                             >
-                              <input
-                                type="checkbox"
-                                checked={editCollectionIds.includes(c.id)}
-                                onChange={() =>
-                                  setEditCollectionIds((prev) =>
-                                    toggleId(prev, c.id),
-                                  )
-                                }
-                              />
                               {c.name}
-                            </label>
+                            </span>
                           ))}
-                        </div>
-                      </div>
-                    )}
-                    {tags.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        <Label>Tags</Label>
-                        <div className="flex flex-wrap gap-3">
-                          {tags.map((t) => (
-                            <label
+                          {note.tags.map((t) => (
+                            <span
                               key={t.id}
-                              className="flex items-center gap-1.5 text-sm"
+                              className="border border-dashed border-ink/40 px-2 py-0.5 font-mono text-[10px] text-ink-soft"
                             >
-                              <input
-                                type="checkbox"
-                                checked={editTagIds.includes(t.id)}
-                                onChange={() =>
-                                  setEditTagIds((prev) => toggleId(prev, t.id))
-                                }
-                              />
-                              {t.name}
-                            </label>
+                              #{t.name}
+                            </span>
                           ))}
                         </div>
+                      )}
+
+                      <div className="mt-auto flex flex-wrap items-end justify-between gap-3 border-t border-paper-edge pt-3">
+                        <MetadataLabel
+                          surface="paper"
+                          layout="inline"
+                          label="Updated"
+                          value={note.updated_at.slice(0, 10)}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditing(note)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(note.id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="gap-2">
-                    <Button onClick={() => handleUpdate(note.id)}>
-                      Save
-                    </Button>
-                    <Button variant="outline" onClick={cancelEditing}>
-                      Cancel
-                    </Button>
-                  </CardFooter>
-                </>
-              ) : (
-                <>
-                  <CardHeader>
-                    <CardTitle className="text-base">
-                      {note.title || "Untitled"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-3">
-                    <p className="whitespace-pre-wrap text-sm">
-                      {note.body}
-                    </p>
-                    {(note.collections.length > 0 || note.tags.length > 0) && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {note.collections.map((c) => (
-                          <Badge key={c.id} variant="secondary">
-                            {c.name}
-                          </Badge>
-                        ))}
-                        {note.tags.map((t) => (
-                          <Badge key={t.id} variant="outline">
-                            {t.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => startEditing(note)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => handleDelete(note.id)}
-                    >
-                      Delete
-                    </Button>
-                  </CardFooter>
-                </>
-              )}
-            </Card>
-          ))
+                    </>
+                  )}
+                </PaperPanel>
+              );
+            })}
+          </ul>
         )}
-      </div>
+      </section>
+    </main>
+  );
+}
+
+/** Divider (collection) and label (tag) pickers, shared by create + edit. */
+function FilingPickers({
+  collections,
+  tags,
+  collectionIds,
+  tagIds,
+  onToggleCollection,
+  onToggleTag,
+}: {
+  collections: Collection[];
+  tags: Tag[];
+  collectionIds: string[];
+  tagIds: string[];
+  onToggleCollection: (id: string) => void;
+  onToggleTag: (id: string) => void;
+}) {
+  if (collections.length === 0 && tags.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-x-8 gap-y-3">
+      {collections.length > 0 && (
+        <fieldset className="min-w-0">
+          <legend className="font-mono text-[10px] uppercase tracking-label text-ink-soft">
+            Dividers
+          </legend>
+          <div className="mt-1.5 flex flex-wrap gap-3">
+            {collections.map((c) => (
+              <label key={c.id} className="flex items-center gap-1.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={collectionIds.includes(c.id)}
+                  onChange={() => onToggleCollection(c.id)}
+                />
+                {c.name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      {tags.length > 0 && (
+        <fieldset className="min-w-0">
+          <legend className="font-mono text-[10px] uppercase tracking-label text-ink-soft">
+            Labels
+          </legend>
+          <div className="mt-1.5 flex flex-wrap gap-3">
+            {tags.map((t) => (
+              <label key={t.id} className="flex items-center gap-1.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={tagIds.includes(t.id)}
+                  onChange={() => onToggleTag(t.id)}
+                />
+                {t.name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
     </div>
   );
 }
