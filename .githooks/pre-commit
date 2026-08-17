@@ -6,7 +6,12 @@
 # Split so this file never contains the literal string itself — otherwise
 # every future commit touching this hook would self-trigger the check.
 BAD='-Z-TYpW7'"smwnzR#"
-if git diff --cached | grep -qF -- "$BAD"; then
+
+# Only check *added* lines (leading "+", excluding the "+++" file header) —
+# not the whole diff. A commit that only *removes* the string (exactly the
+# kind of redaction this hook exists to permit) must not be blocked just
+# because the old line still shows up on the diff's "-" side.
+if git diff --cached | grep '^+' | grep -v '^+++' | grep -qF -- "$BAD"; then
   echo "pre-commit: blocked — staged changes contain the known leaked string." >&2
   echo "See docs/data-sources.md — don't draft this file's content from" >&2
   echo "external sources. If this is a false positive, commit with --no-verify." >&2
