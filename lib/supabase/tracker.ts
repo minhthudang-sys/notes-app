@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import type { PartKind } from "@/lib/tracker/weights";
 
 export type Sprint = {
   id: string;
@@ -14,9 +15,14 @@ export type Part = {
   sprint_id: string;
   name: string;
   status: PartStatus;
+  kind: PartKind;
   planned_completion_date: string | null;
   actual_completion_date: string | null;
   teach_back_done: boolean;
+};
+
+export type Course = {
+  target_date: string | null;
 };
 
 export type Todo = {
@@ -165,4 +171,15 @@ export async function deleteTodo(id: string): Promise<void> {
   const { error } = await supabase.from("todos").delete().eq("id", id);
 
   if (error) throw error;
+}
+
+export async function getCourse(): Promise<Course> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("course")
+    .select("target_date")
+    .single();
+
+  if (error) throw error;
+  return data;
 }
