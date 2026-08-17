@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Workspace — Turing College</title>
+<style>
+  .viz-root{
+    color-scheme: light;
+    --surface-1:#fcfcfb; --page:#f9f9f7;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a;
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+    --success-text:#006300;
+    --ghost:rgba(11,11,11,0.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])) .viz-root{
+      color-scheme: dark;
+      --surface-1:#1a1a19; --page:#0d0d0d;
+      --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70;
+      --success-text:#0ca30c; --ghost:rgba(255,255,255,0.06);
+    }
+  }
+  :root[data-theme="dark"] .viz-root{
+    color-scheme: dark;
+    --surface-1:#1a1a19; --page:#0d0d0d;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70;
+    --success-text:#0ca30c; --ghost:rgba(255,255,255,0.06);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  /* colour lives on .viz-root, not body — the custom properties are scoped here */
+  .viz-root{background:var(--page);color:var(--text-primary);min-height:100vh;padding:28px 22px 60px}
+  .wrap{max-width:1180px;margin:0 auto}
+
+  header.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+  h1{font-size:20px;font-weight:600;margin:0 0 4px;letter-spacing:-0.01em}
+  .sub{font-size:12.5px;color:var(--text-secondary);margin:0;line-height:1.5}
+  .ctrls{display:flex;gap:8px}
+  button.btn{font:inherit;font-size:12.5px;padding:6px 12px;border-radius:8px;cursor:pointer;background:var(--surface-1);color:var(--text-secondary);border:1px solid var(--border)}
+  button.btn:hover{background:var(--ghost)}
+  button.btn[aria-pressed="true"]{color:var(--text-primary);border-color:var(--axis);background:var(--ghost);font-weight:600}
+
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
+  .card h2{font-size:13px;font-weight:600;margin:0 0 2px;letter-spacing:0.01em}
+  .card .hint{font-size:12px;color:var(--text-muted);margin:0 0 16px;line-height:1.5}
+
+  .heroRow{display:grid;grid-template-columns:minmax(250px,1fr) 1.9fr;gap:16px;margin-bottom:16px}
+  @media (max-width:860px){.heroRow{grid-template-columns:1fr}}
+  .hero{display:flex;flex-direction:column;justify-content:center}
+  .hero .label{font-size:12.5px;color:var(--text-secondary);margin-bottom:8px}
+  .hero .figure{font-size:56px;font-weight:600;line-height:1;letter-spacing:-0.03em}
+  .hero .unit{font-size:19px;font-weight:500;color:var(--text-secondary);margin-left:6px}
+  .hero .note{font-size:12.5px;color:var(--text-muted);margin-top:12px;line-height:1.55}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;align-content:start}
+  .tile{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:15px}
+  .tile .label{font-size:11.5px;color:var(--text-secondary);margin-bottom:8px;line-height:1.35}
+  .tile .value{font-size:25px;font-weight:600;line-height:1;letter-spacing:-0.02em}
+  .tile .meta{font-size:11px;color:var(--text-muted);margin-top:7px;line-height:1.45}
+  .meter{height:7px;border-radius:4px;background:var(--grid);overflow:hidden;margin-top:9px}
+  .meter > span{display:block;height:100%;border-radius:4px}
+
+  .status{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500}
+  .ico{font-size:10px;line-height:1;flex:none}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+
+  /* pace gauge */
+  .gauge{position:relative;height:34px;margin:6px 0 4px}
+  .gauge .trackbg{position:absolute;left:0;right:0;top:12px;height:10px;border-radius:5px;background:var(--grid)}
+  .gauge .fill{position:absolute;left:0;top:12px;height:10px;border-radius:5px;background:var(--series-1)}
+  .gauge .req{position:absolute;top:5px;height:24px;width:2px;background:var(--critical);border-radius:1px;z-index:2}
+  .gauge .reqLab{position:absolute;top:-13px;font-size:10.5px;color:var(--critical);transform:translateX(-50%);white-space:nowrap;font-weight:500}
+  .paceGrid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media (max-width:700px){.paceGrid{grid-template-columns:1fr}}
+  .paceFig{font-size:30px;font-weight:600;letter-spacing:-0.02em;line-height:1}
+  .paceLab{font-size:11.5px;color:var(--text-secondary);margin-bottom:6px}
+  .paceSub{font-size:11.5px;color:var(--text-muted);margin-top:6px;line-height:1.45}
+
+  /* review queue */
+  .queue{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:9px}
+  .qi{display:flex;gap:10px;align-items:flex-start;background:var(--page);border:1px solid var(--border);border-left:3px solid var(--warning);border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.4}
+  .qi.rev{border-left-color:var(--good)}
+  .qi .n{font-size:10.5px;color:var(--text-muted);white-space:nowrap;padding-top:1px;min-width:44px}
+  .qi .t{min-width:0}
+  .qi .sp{font-size:10.5px;color:var(--text-muted);display:block;margin-top:3px}
+
+  /* progress by sprint */
+  .spRow{display:grid;grid-template-columns:1fr 108px 74px;gap:12px;align-items:center;padding:9px 0;font-size:12.5px}
+  .spRow + .spRow{border-top:1px solid var(--grid)}
+  .spRow .nm{min-width:0}
+  .spRow .nm span{display:block;font-size:10.5px;color:var(--text-muted);margin-top:2px}
+  .spRow .num{text-align:right;font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--text-secondary)}
+
+  /* todos */
+  ul.todos{list-style:none;margin:0;padding:0}
+  ul.todos li{display:flex;align-items:center;gap:11px;padding:9px 8px;border-radius:8px;font-size:13.5px;line-height:1.35}
+  ul.todos li + li{border-top:1px solid var(--grid)}
+  ul.todos li:hover{background:var(--ghost)}
+  .box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--axis);flex:none}
+  .box.on{background:var(--good);border-color:var(--good);position:relative}
+  .box.on::after{content:"✓";position:absolute;inset:0;color:#fff;font-size:11px;line-height:12px;text-align:center;font-weight:700}
+  .todoText{flex:1;min-width:0}
+  li.done .todoText{color:var(--text-muted);text-decoration:line-through}
+  .due{font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text-secondary)}
+  .pri{width:3px;align-self:stretch;border-radius:2px;flex:none;min-height:18px}
+  .empty{font-size:12.5px;color:var(--text-muted);line-height:1.6;margin:0}
+  .empty code{background:var(--ghost);padding:1px 5px;border-radius:4px;font-size:11.5px}
+
+  /* gantt */
+  .legend{display:flex;gap:15px;flex-wrap:wrap;margin-bottom:14px}
+  .legend span.item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary)}
+  .key{width:14px;height:5px;border-radius:3px;flex:none}
+  .key.hatch{background:repeating-linear-gradient(135deg,var(--axis) 0 2px,transparent 2px 4px);height:9px;border-radius:2px}
+  .gRow{display:grid;grid-template-columns:210px 1fr;gap:14px;align-items:center;padding:7px 0}
+  .gRow + .gRow{border-top:1px solid var(--grid)}
+  .gName{font-size:12.5px;line-height:1.3;min-width:0}
+  .gName .mn{font-size:10.5px;color:var(--text-muted);display:block;margin-top:2px}
+  .track{position:relative;height:30px}
+  .grid{position:absolute;inset:0;pointer-events:none}
+  .grid i{position:absolute;top:0;bottom:0;width:1px;background:var(--grid)}
+  .vline{position:absolute;top:0;bottom:0;width:1px;z-index:3}
+  .bar{position:absolute;height:10px;border-radius:4px}
+  .bar.planned{top:3px;background:var(--series-1)}
+  .bar.actual{top:16px;background:var(--series-3)}
+  .bar.proj{top:16px;background:var(--series-2)}
+  .bar.rev{top:16px;background:repeating-linear-gradient(135deg,var(--series-2) 0 3px,transparent 3px 6px)}
+  .bar.buf{top:16px;background:repeating-linear-gradient(135deg,var(--axis) 0 2px,transparent 2px 4px)}
+  .key.revk{background:repeating-linear-gradient(135deg,var(--series-2) 0 3px,transparent 3px 6px);height:9px;border-radius:2px}
+
+  .dels{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:9px}
+  .del{display:flex;gap:11px;align-items:flex-start;background:var(--page);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.4}
+  .del .w{font-size:10.5px;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;padding-top:1px;min-width:30px;text-align:right}
+  .del .b{min-width:0;flex:1}
+  .del .m{font-size:10.5px;color:var(--text-muted);display:block;margin-top:4px}
+  .axisRow{display:grid;grid-template-columns:210px 1fr;gap:14px;margin-top:4px}
+  .axis{position:relative;height:34px;border-top:1px solid var(--axis)}
+  .axis i.m{position:absolute;top:4px;font-size:10.5px;color:var(--text-muted);transform:translateX(-50%);white-space:nowrap}
+  .axis i.dl{position:absolute;top:18px;font-size:10.5px;transform:translateX(-50%);white-space:nowrap;font-weight:500}
+
+  #tip{position:fixed;z-index:99;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--surface-1);border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:12px;line-height:1.55;color:var(--text-primary);box-shadow:0 6px 20px rgba(0,0,0,0.14);max-width:280px}
+  #tip .r{color:var(--text-secondary)}
+
+  .wiBox{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--page);border:1px solid var(--border);border-radius:11px;padding:15px 17px}
+  .wiBox input[type=range]{flex:1;min-width:190px;accent-color:var(--series-2)}
+  .wiOut{font-size:12.5px;line-height:1.6;margin-top:14px;color:var(--text-secondary)}
+  .wiOut b{color:var(--text-primary);font-weight:600}
+
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--grid);vertical-align:top}
+  th{font-weight:600;color:var(--text-secondary);font-size:11.5px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  #tableCard[hidden]{display:none}
+  footer.foot{font-size:11.5px;color:var(--text-muted);text-align:center;margin-top:24px;line-height:1.7}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+</style>
+</head>
+<body>
+<div class="viz-root">
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1 id="courseName">Study Workspace</h1>
+      <p class="sub" id="subLine"></p>
+    </div>
+    <div class="ctrls">
+      <button class="btn" id="tblBtn" aria-pressed="false">Table view</button>
+      <button class="btn" id="thBtn">Theme</button>
+    </div>
+  </header>
+
+  <div class="heroRow">
+    <div class="card hero">
+      <div class="label" id="heroLabel">Buffer to your target</div>
+      <div><span class="figure" id="heroVal">—</span><span class="unit" id="heroUnit">days</span></div>
+      <div id="heroStatus" style="margin-top:12px"></div>
+      <div class="note" id="heroNote"></div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </div>
+
+  <div class="card">
+    <h2>Pace</h2>
+    <p class="hint" id="paceHint">Measured over calendar days since you started, in weighted units — a reading part is 1, a sprint project 2. Review turnaround is excluded from the "needed" figure, because those days aren't yours to work in.</p>
+    <div class="paceGrid">
+      <div>
+        <div class="paceLab">Your pace so far</div>
+        <div class="paceFig" id="paceNow">—</div>
+        <div class="gauge" id="gauge">
+          <div class="trackbg"></div>
+          <div class="fill" id="gFill"></div>
+          <div class="req" id="gReq"></div>
+          <div class="reqLab" id="gReqLab"></div>
+        </div>
+        <div class="paceSub" id="paceSub"></div>
+      </div>
+      <div>
+        <div class="paceLab">Pace needed to hit your target</div>
+        <div class="paceFig" id="paceReq" style="color:var(--critical)">—</div>
+        <div class="paceSub" id="paceReqSub" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Open to-dos</h2>
+    <p class="hint" id="todoHint"></p>
+    <div id="todoList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Review queue</h2>
+    <p class="hint">Parts you've finished — each is eligible for a Feynman teach-back session. Reviewed ones link to their summary in <code>chapter-summaries/</code>.</p>
+    <div class="queue" id="queue"></div>
+  </div>
+
+  <div class="card">
+    <h2>Build deliverables</h2>
+    <p class="hint" id="delHint"></p>
+    <div class="dels" id="dels"></div>
+  </div>
+
+  <div class="card">
+    <h2>Progress by sprint</h2>
+    <p class="hint">Parts completed out of parts total.</p>
+    <div id="sprintProg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Project timeline</h2>
+    <p class="hint">The platform's planned windows against where your current pace actually lands you. Hover any bar for detail.</p>
+    <div class="legend">
+      <span class="item"><i class="key" style="background:var(--series-1)"></i>Planned (platform)</span>
+      <span class="item"><i class="key" style="background:var(--series-3)"></i>Actual</span>
+      <span class="item"><i class="key" style="background:var(--series-2)"></i>Projected build</span>
+      <span class="item"><i class="key revk"></i>Waiting on project review</span>
+      <span class="item"><i class="key hatch"></i>Buffer</span>
+      <span class="item"><i class="key" style="background:var(--critical);width:2px;height:12px"></i>Today</span>
+    </div>
+    <div id="gantt"></div>
+    <div class="axisRow"><div></div><div class="axis" id="axis"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>What if I speed up?</h2>
+    <p class="hint">Drag either lever and watch the finish date and buffer move. Nothing is saved — it's a scratchpad.</p>
+    <div class="wiBox">
+      <span style="font-size:12.5px;white-space:nowrap">Units per week</span>
+      <input type="range" id="paceSlider" min="1" max="20" step="0.5">
+      <span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;min-width:38px;text-align:right" id="paceOut">—</span>
+      <button class="btn" id="resetPace">Reset</button>
+    </div>
+    <div class="wiBox" style="margin-top:10px">
+      <span style="font-size:12.5px;white-space:nowrap">Project review turnaround</span>
+      <input type="range" id="revSlider" min="0" max="14" step="1">
+      <span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;min-width:38px;text-align:right" id="revOut">—</span>
+      <span style="font-size:11.5px;color:var(--text-muted)">days</span>
+    </div>
+    <div class="wiOut" id="wiOut"></div>
+  </div>
+
+  <div class="card" id="tableCard" hidden>
+    <h2>Table view</h2>
+    <p class="hint">Every value in the timeline, as text.</p>
+    <div style="overflow-x:auto"><table id="tbl"></table></div>
+  </div>
+
+  <footer class="foot" id="foot"></footer>
+</div>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const DATA = __COURSE_DATA__;
+const MS = 86400000;
+const pd = s => s ? new Date(s + "T00:00:00") : null;
+const addD = (d,n) => { const x = new Date(d.getTime()); x.setDate(x.getDate()+n); return x; };
+const diffD = (a,b) => Math.round((b.getTime()-a.getTime())/MS);
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const plural = (n,w) => `${n} ${w}${Math.abs(n)===1?"":"s"}`;
+const fmt  = d => d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+const fmtY = d => d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+
+const TODAY  = pd(DATA.today) || new Date(new Date().toDateString());
+const START  = pd(DATA.start_date);
+const TARGET = pd(DATA.target_deadline);
+const PROG   = pd(DATA.programme_deadline);
+const SPRINTS = DATA.sprints || [];
+const DONE_ST = new Set(["done","passed"]);
+
+/* planned windows: each sprint runs from the previous deadline to its own */
+(function windows(){
+  let prev = START;
+  SPRINTS.forEach(s=>{
+    s._ps = prev;
+    s._pe = pd(s.platform_deadline);
+    prev = addD(s._pe, 1);
+  });
+})();
+
+/* effort is weighted: a sprint project is worth ~2 reading parts, a mid-sprint one ~1.5 */
+const W = DATA.weights || {};
+const wOf = p => W[p.kind] ?? 1;
+const BUILT   = new Set(["done","passed","submitted","in_review","corrections"]); // effort spent
+const PASSED  = new Set(["done","passed"]);                                       // fully closed
+const IS_DELIV = k => k==="project" || k==="mid_project" || k==="capstone";
+const r1 = n => Math.round(n*10)/10;
+
+const ALL_PARTS = SPRINTS.flatMap(s => s.parts.map(p=>({...p, sprint:s})));
+const TOTAL_N  = ALL_PARTS.length;
+const DONE_N   = ALL_PARTS.filter(p=>PASSED.has(p.status)).length;
+const TOTAL_U  = ALL_PARTS.reduce((a,p)=>a+wOf(p),0);
+const BUILT_U  = ALL_PARTS.filter(p=>BUILT.has(p.status)).reduce((a,p)=>a+wOf(p),0);
+const REMAIN_U = TOTAL_U - BUILT_U;
+const REMAIN_N = TOTAL_N - DONE_N;
+const ELAPSED  = Math.max(1, diffD(START, TODAY));
+const OBS_PACE = BUILT_U / ELAPSED;              // weighted units per calendar day
+const DAYS_LEFT = diffD(TODAY, TARGET);
+const REV_N     = DATA.observed_review_n || 0;
+const DEF_REV   = DATA.observed_review_days ?? DATA.default_review_days ?? 0;
+const REV_SRC   = REV_N ? `measured from ${plural(REV_N,"real review")}` : `assumed — no real reviews logged yet`;
+
+/* review turnaround is on the critical path — the next sprint stays locked until this one passes */
+const revOf = (s, rev) => s.parts.some(x=>IS_DELIV(x.kind) && !PASSED.has(x.status))
+  ? (s.review_days ?? rev) : 0;
+const totalRev = rev => SPRINTS.filter(s=>!s.completed).reduce((a,s)=>a+revOf(s,rev),0);
+
+/* pace you'd need if review days eat into the runway */
+const reqPaceAt = rev => {
+  const build = DAYS_LEFT - totalRev(rev);
+  return build > 0 ? REMAIN_U / build : Infinity;
+};
+const REQ_PACE = reqPaceAt(DEF_REV);
+
+let pace = OBS_PACE;      // live, draggable
+let revDays = DEF_REV;    // live, draggable
+
+/* ---------- engine ---------- */
+function project(p, rev){
+  const rows = [];
+  const partProj = {};              // "sprintId|part n" -> projected completion date
+  let cursor = TODAY;
+  SPRINTS.forEach(s=>{
+    const unitsAll  = s.parts.reduce((a,x)=>a+wOf(x),0);
+    const unitsLeft = s.parts.filter(x=>!BUILT.has(x.status)).reduce((a,x)=>a+wOf(x),0);
+    const done = s.parts.filter(x=>PASSED.has(x.status)).length;
+    const r = {s, tot:s.parts.length, done, left:s.parts.length-done,
+               unitsAll, unitsLeft, ps:s._ps, pe:s._pe, rv:0};
+    if (s.completed){
+      r.state="done"; r.start=pd(s.started); r.end=pd(s.completed); r.buildEnd=r.end;
+    } else {
+      r.state = s.started ? "active" : "future";
+      r.rv = revOf(s, rev);
+      r.start = s.started ? pd(s.started) : cursor;
+      const bd = p>0 ? Math.ceil(unitsLeft/p) : 9999;
+      r.buildStart = cursor;
+      r.buildDays = bd;
+      r.buildEnd = addD(cursor, Math.max(0,bd-1));
+      r.end = addD(r.buildEnd, r.rv);
+      r.slack = diffD(r.end, r.pe);
+      // walk the sprint's own parts so each deliverable gets its own landing date,
+      // not the whole sprint's — a mid-sprint project lands well before the sprint project
+      let cum = 0;
+      s.parts.forEach(x=>{
+        if (BUILT.has(x.status)) return;
+        cum += wOf(x);
+        partProj[s.id+"|"+x.n] = addD(cursor, p>0 ? Math.max(0, Math.ceil(cum/p)-1) : 0);
+      });
+      cursor = addD(r.end, 1);
+    }
+    rows.push(r);
+  });
+  const finish = rows[rows.length-1].end;
+  return {rows, partProj, finish, buffer: diffD(finish, TARGET), progBuffer: diffD(finish, PROG),
+          revTotal: rows.reduce((a,r)=>a+r.rv,0)};
+}
+
+const STATUS = {
+  good:    {c:"var(--good)",     i:"●"},
+  warning: {c:"var(--warning)",  i:"▲"},
+  serious: {c:"var(--serious)",  i:"▲"},
+  critical:{c:"var(--critical)", i:"■"}
+};
+const stateOf = b => b===null ? "good" : b < -7 ? "critical" : b < 0 ? "serious" : b <= 7 ? "warning" : "good";
+const badge = (k,label) => `<span class="status" style="color:${STATUS[k].c}"><span class="ico">${STATUS[k].i}</span>${esc(label)}</span>`;
+
+/* ---------- static blocks (rendered once) ---------- */
+function renderStatic(){
+  document.getElementById("courseName").textContent = DATA.course;
+  document.getElementById("subLine").innerHTML =
+    `${esc(DATA.student)} · started ${fmtY(START)} · <b>your target ${fmtY(TARGET)}</b> · platform capstone ${fmtY(PROG)} · today ${fmtY(TODAY)}`;
+
+  /* to-dos */
+  const td = DATA.todos || [];
+  const open = td.filter(t=>!t.done), doneT = td.filter(t=>t.done);
+  document.getElementById("todoHint").textContent = td.length
+    ? `${open.length} open${doneT.length?` · ${doneT.length} done`:""}.`
+    : "This list is yours to fill — it starts empty on purpose.";
+  const priCol = {high:"var(--critical)", medium:"var(--warning)", low:"var(--axis)"};
+  let h = "";
+  if (open.length){
+    h += `<ul class="todos">` + open
+      .sort((a,b)=>(a.due?pd(a.due):9e15)-(b.due?pd(b.due):9e15))
+      .map(t=>{
+        const dd = t.due?pd(t.due):null;
+        const late = dd && dd < TODAY, soon = dd && !late && diffD(TODAY,dd) <= 2;
+        return `<li><i class="pri" style="background:${priCol[t.priority]||"var(--axis)"}"></i><span class="box"></span>
+          <span class="todoText">${esc(t.text)}</span>
+          <span class="due" style="${late?"color:var(--critical);font-weight:600":soon?"color:var(--serious)":""}">${dd?fmt(dd):"no date"}${late?" · overdue":""}</span></li>`;
+      }).join("") + `</ul>`;
+  } else {
+    h += `<p class="empty">Nothing here yet. Tell Claude <em>"add a to-do: submit the Sprint 2 peer review by Friday"</em> and it lands here — with a due date, a priority, and overdue highlighting. Peer reviews, standups, corrections and admin are the things worth tracking; the course parts themselves are already covered by the review queue and timeline below.</p>`;
+  }
+  if (doneT.length) h += `<ul class="todos" style="margin-top:14px">` + doneT.slice(-5).map(t=>
+    `<li class="done"><i class="pri" style="background:var(--axis)"></i><span class="box on"></span><span class="todoText">${esc(t.text)}</span><span class="due">${t.due?fmt(pd(t.due)):""}</span></li>`).join("") + `</ul>`;
+  document.getElementById("todoList").innerHTML = h;
+
+  /* review queue */
+  const q = ALL_PARTS.filter(p=>PASSED.has(p.status));
+  document.getElementById("queue").innerHTML = q.length ? q.map(p=>
+    `<div class="qi${p.reviewed?" rev":""}">
+       <span class="n">${esc(p.n)}</span>
+       <span class="t">${esc(p.name)}<span class="sp">${esc(p.sprint.name.split("—")[0].trim())}${p.reviewed?" · reviewed":""}</span></span>
+     </div>`).join("") : `<p class="empty">Nothing finished yet.</p>`;
+
+  /* progress by sprint */
+  document.getElementById("sprintProg").innerHTML = SPRINTS.map(s=>{
+    const tot = s.parts.length, dn = s.parts.filter(x=>PASSED.has(x.status)).length;
+    const ip = s.parts.some(x=>x.status==="in_progress");
+    const p = Math.round(dn/tot*100);
+    const col = p===100 ? "var(--good)" : ip||dn>0 ? "var(--series-1)" : "var(--axis)";
+    return `<div class="spRow">
+      <div class="nm">${esc(s.name)}<span>deadline ${fmtY(pd(s.platform_deadline))}</span></div>
+      <div class="meter" style="margin:0"><span style="width:${p}%;background:${col}"></span></div>
+      <div class="num">${dn} / ${tot}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- live blocks ---------- */
+function renderLive(){
+  const M = project(pace, revDays);
+  const st = stateOf(M.buffer);
+  const b = M.buffer;
+
+  /* hero */
+  document.getElementById("heroVal").textContent = (b>0?"+":"") + b;
+  document.getElementById("heroVal").style.color = st==="good" ? "var(--text-primary)" : STATUS[st].c;
+  document.getElementById("heroUnit").textContent = Math.abs(b)===1 ? "day" : "days";
+  document.getElementById("heroStatus").innerHTML = badge(st,
+    b < 0 ? `Overruns your ${fmt(TARGET)} target by ${plural(-b,"day")}` : `Lands ${plural(b,"day")} early`);
+  document.getElementById("heroNote").innerHTML =
+    `Projected finish <b>${fmtY(M.finish)}</b> at ${(pace*7).toFixed(1)} units/week — ${plural(REMAIN_N,"part")} left ` +
+    `(${r1(REMAIN_U)} weighted units) plus ${plural(M.revTotal,"day")} waiting on project reviews.<br>` +
+    `Against the platform's own ${fmt(PROG)} capstone date you are ` +
+    (M.progBuffer >= 0 ? `<b style="color:var(--success-text)">${plural(M.progBuffer,"day")} clear</b>.` : `<b style="color:var(--critical)">${plural(-M.progBuffer,"day")} over</b>.`);
+
+  /* tiles */
+  const reviewed = ALL_PARTS.filter(p=>p.reviewed).length;
+  const queue = DONE_N - reviewed;
+  const delAll = ALL_PARTS.filter(p=>IS_DELIV(p.kind));
+  const delDone = delAll.filter(p=>PASSED.has(p.status)).length;
+  const nextDl = SPRINTS.filter(s=>!s.completed).map(s=>pd(s.platform_deadline)).sort((a,b)=>a-b)[0];
+  const dToNext = nextDl ? diffD(TODAY, nextDl) : null;
+  const pctU = Math.round(BUILT_U/TOTAL_U*100);
+  document.getElementById("tiles").innerHTML = `
+    <div class="tile">
+      <div class="label">Effort done (weighted)</div>
+      <div class="value">${pctU}<span style="font-size:15px;color:var(--text-muted);font-weight:500">%</span></div>
+      <div class="meter"><span style="width:${pctU}%;background:var(--series-1)"></span></div>
+      <div class="meta">${DONE_N} / ${TOTAL_N} parts · ${r1(REMAIN_U)} of ${r1(TOTAL_U)} units left</div>
+    </div>
+    <div class="tile">
+      <div class="label">Builds passed</div>
+      <div class="value" style="${delDone<delAll.length?'color:var(--warning)':''}">${delDone}<span style="font-size:15px;color:var(--text-muted);font-weight:500"> / ${delAll.length}</span></div>
+      <div class="meta">${plural(delAll.length-delDone,"deliverable")} still to ship</div>
+    </div>
+    <div class="tile">
+      <div class="label">Ready for teach-back</div>
+      <div class="value" style="${queue?'color:var(--warning)':''}">${queue}</div>
+      <div class="meta">${reviewed} reviewed so far</div>
+    </div>
+    <div class="tile">
+      <div class="label">Open to-dos</div>
+      <div class="value">${(DATA.todos||[]).filter(t=>!t.done).length}</div>
+      <div class="meta">You add these as they come up</div>
+    </div>
+    <div class="tile">
+      <div class="label">Next platform deadline</div>
+      <div class="value" style="font-size:20px">${nextDl?fmt(nextDl):"—"}</div>
+      <div class="meta">${dToNext!==null ? (dToNext>=0?`${plural(dToNext,"day")} away`:`${plural(-dToNext,"day")} ago`) : "—"}</div>
+    </div>
+    <div class="tile">
+      <div class="label">Days to your target</div>
+      <div class="value" style="${DAYS_LEFT<0?'color:var(--critical)':''}">${DAYS_LEFT}</div>
+      <div class="meta">${fmtY(TARGET)}</div>
+    </div>`;
+
+  /* pace panel — drawn against observed & required, not the slider */
+  const obsW = OBS_PACE*7, reqW = REQ_PACE*7;
+  const scale = Math.max(obsW, reqW) * 1.35;
+  document.getElementById("paceNow").innerHTML = `${obsW.toFixed(1)}<span style="font-size:14px;font-weight:500;color:var(--text-secondary)"> units / week</span>`;
+  document.getElementById("gFill").style.width = `${Math.min(100, obsW/scale*100)}%`;
+  document.getElementById("gReq").style.left = `${Math.min(100, reqW/scale*100)}%`;
+  const rl = document.getElementById("gReqLab");
+  rl.style.left = `${Math.min(96, reqW/scale*100)}%`;
+  rl.textContent = `needed ${reqW.toFixed(1)}`;
+  document.getElementById("paceSub").innerHTML =
+    `${r1(BUILT_U)} units (${DONE_N} parts) in ${plural(ELAPSED,"day")} since ${fmt(START)} — one reading part every ${(1/OBS_PACE).toFixed(1)} days.`;
+  document.getElementById("paceReq").innerHTML = `${reqW.toFixed(1)}<span style="font-size:14px;font-weight:500;color:var(--text-secondary)"> units / week</span>`;
+  const gap = reqW/obsW;
+  const rvTot = totalRev(DEF_REV);
+  document.getElementById("paceReqSub").innerHTML =
+    `${r1(REMAIN_U)} units in ${plural(DAYS_LEFT-rvTot,"working day")} — ${plural(rvTot,"day")} of the ${DAYS_LEFT} left are spent waiting on project reviews, not building ` +
+    `<span style="color:${REV_N?"var(--success-text)":"var(--text-muted)"}">(${REV_SRC}, ${DEF_REV}d/project)</span>. ` +
+    (gap>1 ? `That's <b style="color:var(--critical)">${gap.toFixed(1)}×</b> your current pace.`
+           : `You're already <b style="color:var(--success-text)">${(1/gap).toFixed(1)}×</b> ahead of what's needed.`);
+
+  /* deliverables */
+  const DEL_LABEL = {mid_project:"Mid-sprint project", project:"Sprint project", capstone:"Capstone"};
+  const DSTAT = {
+    not_started:{k:"warning", t:"Not started"}, in_progress:{k:"warning", t:"Building"},
+    submitted:{k:"warning", t:"Submitted — awaiting review"}, in_review:{k:"warning", t:"In review"},
+    corrections:{k:"critical", t:"Corrections requested"},
+    done:{k:"good", t:"Passed"}, passed:{k:"good", t:"Passed"}
+  };
+  document.getElementById("delHint").innerHTML =
+    `${delDone} of ${delAll.length} passed. A sprint project is weighted <b>${W.project}×</b> a reading part, a mid-sprint project <b>${W.mid_project}×</b>, the capstone <b>${W.capstone}×</b> — and each sprint project adds a review turnaround before the next sprint unlocks.`;
+  document.getElementById("dels").innerHTML = delAll.map(p=>{
+    const r = M.rows.find(x=>x.s.id===p.sprint.id);
+    const ds = DSTAT[p.status] || DSTAT.not_started;
+    const land = M.partProj[p.sprint.id+"|"+p.n];
+    const isLast = p.kind !== "mid_project";        // the sprint project closes the sprint
+    const when = PASSED.has(p.status)
+      ? (p.passed_on ? `passed ${fmt(pd(p.passed_on))}` : "passed")
+      : `lands ~${land?fmt(land):fmt(r.buildEnd)}${(isLast && r.rv)?` · +${plural(r.rv,"day")} review`:""}`;
+    const scoreLine = p.review_score!=null
+      ? `<span style="display:block;margin-top:5px;font-size:11.5px;color:var(--text-secondary)">Scored <b style="color:var(--text-primary)">${p.review_score}/100</b>${p.reviewer?` · reviewed by ${esc(p.reviewer)}`:""}</span>`
+      : "";
+    return `<div class="del">
+      <span class="w">${wOf(p)}×</span>
+      <span class="b">${esc(p.name.replace(/^(Sprint Project|Mid-Sprint Project|Practice Project):\s*/,""))}
+        <span class="m">${[DEL_LABEL[p.kind]||p.kind, p.sprint.name.split("—")[0].trim(), when]
+            .filter((v,i,a)=>a.indexOf(v)===i).map(esc).join(" · ")}</span>
+        <span style="display:block;margin-top:6px">${badge(ds.k, ds.t)}</span>${scoreLine}</span></div>`;
+  }).join("");
+
+  /* gantt */
+  const dates = [START, TODAY, TARGET, PROG, M.finish];
+  M.rows.forEach(r=>dates.push(r.ps,r.pe,r.start,r.end));
+  let t0 = addD(new Date(Math.min(...dates.map(d=>d.getTime()))), -4);
+  let t1 = addD(new Date(Math.max(...dates.map(d=>d.getTime()))),  6);
+  const span = Math.max(1, diffD(t0,t1));
+  const X = d => diffD(t0,d)/span*100;
+
+  let gl="", ax="";
+  const c = new Date(t0.getFullYear(), t0.getMonth()+1, 1);
+  while (c <= t1){
+    gl += `<i style="left:${X(c)}%"></i>`;
+    ax += `<i class="m" style="left:${X(c)}%">${c.toLocaleDateString("en-GB",{month:"short"})}</i>`;
+    c.setMonth(c.getMonth()+1);
+  }
+  const marks = `<div class="vline" style="left:${X(TODAY)}%;background:var(--critical)"></div>`;
+
+  document.getElementById("gantt").innerHTML = M.rows.map(r=>{
+    const pw = Math.max(0.5, X(addD(r.pe,1)) - X(r.ps));
+    const bw = Math.max(0.5, X(addD(r.buildEnd,1)) - X(r.start));
+    const cls = r.state==="done" ? "actual" : "proj";
+    const lab = r.state==="done" ? "Actual" : "Projected build";
+    const days = diffD(r.start, r.end)+1;
+    const extra = r.state==="done"
+      ? `Completed · ${r.tot} parts (${r1(r.unitsAll)} units) in ${plural(days,"day")}`
+      : `${r.left} of ${r.tot} parts left · ${r1(r.unitsLeft)} units` +
+        `<br><span class="r">${r.slack>=0?`${plural(r.slack,"day")} of slack to its deadline`:`${plural(-r.slack,"day")} past its deadline`}</span>`;
+    const tp = `<b>${esc(r.s.name)}</b><br><span class="r">Planned</span> ${fmt(r.ps)} → ${fmt(r.pe)}`;
+    const ta = `<b>${esc(r.s.name)}</b><br><span class="r">${lab}</span> ${fmt(r.start)} → ${fmt(r.buildEnd)}<br><span class="r">${extra}</span>`;
+    const trv = `<b>${esc(r.s.name)}</b><br><span class="r">Project review</span> ${fmt(addD(r.buildEnd,1))} → ${fmt(r.end)}<br><span class="r">${plural(r.rv,"day")} assumed turnaround. The next sprint stays locked until this passes.</span>`;
+    const revBar = r.rv > 0
+      ? `<div class="bar rev" style="left:${X(addD(r.buildEnd,1))}%;width:${Math.max(0.4, X(addD(r.end,1))-X(addD(r.buildEnd,1)))}%" data-tip="${esc(trv)}"></div>`
+      : ``;
+    return `<div class="gRow">
+      <div class="gName">${esc(r.s.name.split("—")[0].trim())}<span class="mn">${esc((r.s.name.split("—")[1]||"").trim())}</span></div>
+      <div class="track"><div class="grid">${gl}</div>${marks}
+        <div class="bar planned" style="left:${X(r.ps)}%;width:${pw}%" data-tip="${esc(tp)}"></div>
+        <div class="bar ${cls}" style="left:${X(r.start)}%;width:${bw}%" data-tip="${esc(ta)}"></div>
+        ${revBar}
+      </div></div>`;
+  }).join("") + `<div class="gRow">
+      <div class="gName">Buffer to your target<span class="mn">${fmtY(TARGET)}</span></div>
+      <div class="track"><div class="grid">${gl}</div>${marks}
+        ${b>0
+          ? `<div class="bar buf" style="left:${X(addD(M.finish,1))}%;width:${Math.max(0.5,X(TARGET)-X(addD(M.finish,1)))}%" data-tip="${esc(`<b>Buffer</b><br>${plural(b,"free day")} between your projected finish and your target.`)}"></div>`
+          : `<div class="bar" style="left:${X(TARGET)}%;width:${Math.max(0.5,X(addD(M.finish,1))-X(TARGET))}%;background:var(--critical)" data-tip="${esc(`<b>Overrun</b><br>Projected to finish ${plural(-b,"day")} after your ${fmt(TARGET)} target.`)}"></div>`}
+      </div></div>`;
+
+  ax += `<i class="dl" style="left:${X(TARGET)}%;color:var(--critical)">▲ your target</i>`;
+  ax += `<i class="dl" style="left:${X(PROG)}%;color:var(--text-muted)">▲ capstone</i>`;
+  document.getElementById("axis").innerHTML = ax;
+
+  /* what-if readout */
+  document.getElementById("paceOut").textContent = (pace*7).toFixed(1);
+  document.getElementById("revOut").textContent = revDays;
+  const deltas = [];
+  if (Math.abs(pace-OBS_PACE) > 1e-9) deltas.push(`your actual pace is ${(OBS_PACE*7).toFixed(1)}`);
+  if (revDays !== DEF_REV) deltas.push(`the ${REV_N?"measured":"assumed"} turnaround is ${DEF_REV}d`);
+  document.getElementById("wiOut").innerHTML =
+    `At <b>${(pace*7).toFixed(1)} units/week</b> with a <b>${plural(revDays,"day")}</b> review turnaround you finish <b>${fmtY(M.finish)}</b> — ` +
+    (b>=0 ? `<b style="color:var(--success-text)">${plural(b,"day")} before</b>` : `<b style="color:var(--critical)">${plural(-b,"day")} after</b>`) +
+    ` your ${fmt(TARGET)} target. Reviews alone account for ${plural(M.revTotal,"day")} of that.` +
+    (deltas.length ? ` <span style="color:var(--text-muted)">(Baseline: ${deltas.join("; ")}.)</span>` : ``);
+
+  /* table */
+  document.getElementById("tbl").innerHTML =
+    `<thead><tr><th>Sprint</th><th class="num">Parts</th><th class="num">Units left</th><th>Planned window</th><th>Build</th><th class="num">Review</th><th class="num">Slack</th><th>State</th></tr></thead><tbody>` +
+    M.rows.map(r=>{
+      const sl = r.state==="done" ? diffD(r.end, r.pe) : r.slack;
+      const k = r.state==="done" ? "good" : sl>7?"good":sl>=0?"warning":"critical";
+      return `<tr><td>${esc(r.s.name)}</td><td class="num">${r.done} / ${r.tot}</td>
+        <td class="num">${r.state==="done"?"—":r1(r.unitsLeft)}</td>
+        <td>${fmt(r.ps)} → ${fmt(r.pe)}</td><td>${fmt(r.start)} → ${fmt(r.buildEnd)}</td>
+        <td class="num">${r.rv?`+${r.rv} d`:"—"}</td>
+        <td class="num" style="color:${sl>=0?"var(--success-text)":"var(--critical)"}">${sl>0?"+":""}${sl} d</td>
+        <td>${badge(k, r.state==="done"?"Completed":r.state==="active"?"In progress":"Not started")}</td></tr>`;
+    }).join("") +
+    `</tbody><tfoot><tr><th colspan="4">Projected finish at ${(pace*7).toFixed(1)} units/week</th><th>${fmtY(M.finish)}</th>
+      <th class="num">${M.revTotal} d</th>
+      <th class="num" style="color:${b>=0?"var(--success-text)":"var(--critical)"}">${b>0?"+":""}${b} d</th><th>${badge(st,"vs your target")}</th></tr></tfoot>`;
+}
+
+/* ---------- interaction ---------- */
+const tip = document.getElementById("tip");
+document.addEventListener("mouseover", e=>{
+  const el = e.target.closest("[data-tip]");
+  if(!el){ tip.style.opacity=0; return; }
+  tip.innerHTML = el.getAttribute("data-tip"); tip.style.opacity=1;
+});
+document.addEventListener("mousemove", e=>{
+  if(tip.style.opacity!=="1") return;
+  const r = tip.getBoundingClientRect();
+  let x=e.clientX+15, y=e.clientY+15;
+  if(x+r.width  > innerWidth -8) x = e.clientX - r.width  - 15;
+  if(y+r.height > innerHeight-8) y = e.clientY - r.height - 15;
+  tip.style.left=x+"px"; tip.style.top=y+"px";
+});
+document.addEventListener("mouseout", e=>{ if(e.target.closest("[data-tip]")) tip.style.opacity=0; });
+
+const slider = document.getElementById("paceSlider");
+const rslider = document.getElementById("revSlider");
+slider.value = (OBS_PACE*7).toFixed(1);
+rslider.value = DEF_REV;
+slider.addEventListener("input",  ()=>{ pace = (+slider.value)/7; renderLive(); });
+rslider.addEventListener("input", ()=>{ revDays = +rslider.value;  renderLive(); });
+document.getElementById("resetPace").onclick = ()=>{
+  pace = OBS_PACE; revDays = DEF_REV;
+  slider.value = (OBS_PACE*7).toFixed(1); rslider.value = DEF_REV;
+  renderLive();
+};
+document.getElementById("tblBtn").onclick = e=>{
+  const c = document.getElementById("tableCard");
+  c.hidden = !c.hidden;
+  e.currentTarget.setAttribute("aria-pressed", String(!c.hidden));
+  e.currentTarget.textContent = c.hidden ? "Table view" : "Hide table";
+  // the card lands at the bottom of a long page — without this, clicking reads as "did nothing"
+  if (!c.hidden) c.scrollIntoView({behavior:"smooth", block:"start"});
+};
+document.getElementById("thBtn").onclick = ()=>{
+  const r = document.documentElement, cur = r.getAttribute("data-theme");
+  const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  r.setAttribute("data-theme", cur==="dark" ? "light" : cur==="light" ? "dark" : (sysDark?"light":"dark"));
+};
+
+document.getElementById("foot").innerHTML =
+  `Generated ${esc(DATA.generated_at||"")} from <code>course-data.json</code> · rebuild with <code>python3 build_dashboard.py</code>`;
+
+renderStatic();
+renderLive();
+</script>
+</body>
+</html>
