@@ -17,6 +17,7 @@ an explicit stop condition, so there's never a contradiction between "what to bu
 | 7 | Project review workflow + STL log + review turnaround | Scoped to project/capstone parts only |
 | 8 | What-if controls + advanced timeline | Depends on prompt 7's review-turnaround data |
 | 9 | **Final responsive, accessibility, and regression audit** | Runs last, so nothing built in 7–8 escapes it |
+| — | *Optional: Colour-coded tags* | *Independent of the tracker — can run any time after Prompt 2. See the end of this doc.* |
 
 ## Two corrections from the previous version of this doc
 
@@ -890,4 +891,62 @@ Definition of done for this run:
   and the regression checklist above, with what you fixed.
 - Tests, linting, and the production build pass.
 - Any remaining known limitation is listed explicitly rather than left implied.
+```
+
+---
+
+## Optional — Colour-coded tags
+
+The assignment requires completing at least one optional task via a dedicated feature
+branch and pull request. This is that task. It only touches notes/tags (built in
+Prompt 2) — it doesn't depend on, or get depended on by, any of the tracker prompts
+(3 and up), so it's safe to run whenever, in any order relative to them.
+
+```
+You're working in the existing notes-app. Notes, collections, and tags (Prompt 2) are
+already working, and the folder/case-file design tokens (Prompt 4) already exist.
+
+Task for this run only: give each tag a colour from a small fixed palette, and show it
+as a coloured dot or pill wherever tags appear. This is an optional task for the
+assignment — do all of this on a dedicated feature branch, and open a pull request
+against main rather than committing directly. Don't merge it yourself; leave the PR
+open for me to review.
+
+Do:
+- Inspect the current tag UI first — how tags are created, and everywhere they're
+  currently displayed (note cards, the filter panel's tag list) — before changing
+  anything.
+- Add a `color` column to the `tags` table. Store a token key (e.g. "red", "olive"),
+  not a raw hex value or a freeform color — colour stays constrained to the palette
+  below, no custom color picker.
+- Define a small fixed tag palette (6-8 colours) as part of the existing shared
+  design-token file from Prompt 4 — same file, same pattern, not a separate one-off
+  set of colours. Make it visually consistent with the sprint folder palette but
+  distinguishable from it in context, since a tag colour and a sprint's folder colour
+  mean different things and shouldn't be confusable — e.g. keep tag colours as small
+  swatches (dots/pills) rather than colour-blocking a whole card the way a folder does.
+- Let a colour be chosen from that palette when creating a tag (swatch picker, not a
+  text/hex input), and let it be changed afterward.
+- Migrate any existing tags to a sensible default colour — don't leave the column
+  null or break existing tag data.
+- Display the colour as a small dot or pill next to the tag's name in both places
+  tags currently show up: on note cards, and in the filter panel's tag list.
+
+Don't:
+- Don't touch collections, search, notes CRUD, or anything on the study-tracker side
+  of the app.
+- Don't build a full custom colour picker — the fixed palette is the whole point,
+  it keeps the archive's visual language consistent.
+- Don't change how tag filtering itself works — this is presentation only.
+
+Definition of done for this run:
+- Every tag has a colour from the fixed palette, stored in Supabase.
+- The colour shows as a dot/pill next to the tag name on note cards and in the
+  filter panel.
+- Creating a new tag lets me pick its colour from the palette; pre-existing tags got
+  a sensible default via migration, not a null or broken value.
+- The work is on its own feature branch, with a pull request open against main —
+  not committed directly to main.
+
+Finish by reporting what you verified, the branch name, and the PR link/number.
 ```
