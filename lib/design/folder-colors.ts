@@ -12,6 +12,7 @@ export const FOLDER_COLORS = [
   "olive",
   "mustard",
   "purple",
+  "teal",
 ] as const;
 
 export type FolderColor = (typeof FOLDER_COLORS)[number];
@@ -23,11 +24,17 @@ export type FolderColor = (typeof FOLDER_COLORS)[number];
  * across devices, without storing the colour in the database.
  */
 export function folderColorForSprint(sprint: { id: string }): FolderColor {
-  let hash = 0;
+  // FNV-1a, not a `hash*31 + c` roll: with a 5-entry palette, 31 ≡ 1
+  // (mod 5), so every power of 31 collapses to 1 and the polynomial
+  // hash degenerates into "sum of character codes" — order stops
+  // mattering and same-length, same-alphabet ids (like our UUIDs)
+  // pile into a couple of buckets instead of spreading across five.
+  let hash = 0x811c9dc5;
   for (let i = 0; i < sprint.id.length; i++) {
-    hash = (hash * 31 + sprint.id.charCodeAt(i)) >>> 0;
+    hash ^= sprint.id.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
   }
-  return FOLDER_COLORS[hash % FOLDER_COLORS.length];
+  return FOLDER_COLORS[(hash >>> 0) % FOLDER_COLORS.length];
 }
 
 /**

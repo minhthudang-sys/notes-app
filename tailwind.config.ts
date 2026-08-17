@@ -47,6 +47,7 @@ export default {
           olive: "hsl(var(--folder-olive) / <alpha-value>)",
           mustard: "hsl(var(--folder-mustard) / <alpha-value>)",
           purple: "hsl(var(--folder-purple) / <alpha-value>)",
+          teal: "hsl(var(--folder-teal) / <alpha-value>)",
         },
 
         /* shadcn/ui contract — see globals.css */

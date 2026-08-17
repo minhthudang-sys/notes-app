@@ -7,15 +7,24 @@ import { cn } from "@/lib/utils";
 
 const AREAS = [
   { href: "/tracker", label: "Archive", hint: "Sprints & chapters" },
+  { href: "/tracker/dashboard", label: "Dashboard", hint: "Progress & timeline" },
   { href: "/notes", label: "Index", hint: "All notes" },
 ];
 
 /**
- * The archive's chrome. Keeps the two functional areas — the sprint
- * archive and the notes index — legible as one application.
+ * The archive's chrome. Keeps the functional areas — the sprint
+ * archive, the dashboard and the notes index — legible as one
+ * application.
  */
 export function ArchiveHeader() {
   const pathname = usePathname();
+
+  // Longest-prefix match, so nested routes (e.g. /tracker/dashboard)
+  // highlight only their own tab, not "Archive" too.
+  const activeHref = [...AREAS]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((area) => pathname === area.href || pathname.startsWith(area.href + "/"))
+    ?.href;
 
   return (
     <header className="border-b border-archive-rule bg-archive-deep">
@@ -29,7 +38,7 @@ export function ArchiveHeader() {
 
         <nav aria-label="Archive areas" className="flex items-center gap-1">
           {AREAS.map((area) => {
-            const active = pathname.startsWith(area.href);
+            const active = area.href === activeHref;
             return (
               <Link
                 key={area.href}

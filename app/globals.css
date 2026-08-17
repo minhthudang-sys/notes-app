@@ -40,6 +40,7 @@
     --folder-olive: 74 22% 34%;
     --folder-mustard: 41 52% 46%;
     --folder-purple: 280 20% 45%;
+    --folder-teal: 165 28% 36%;
 
     /* Set per-folder by folderColorVars(); defaults to blue so a
      * component rendered outside a Folder still resolves. */
