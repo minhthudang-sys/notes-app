@@ -136,8 +136,12 @@ A tag's name with a small colour dot, never a colour-blocked surface.
 
 ### `TagColorPicker`
 
-A swatch picker over the fixed `TAG_COLORS` palette — no freeform
-colour input. Used both when creating a tag and when changing an
+A dropdown (built on `components/ui/dropdown-menu.tsx`, i.e.
+`@radix-ui/react-dropdown-menu`) over the fixed `TAG_COLORS` palette —
+no freeform colour input. The trigger shows the current swatch; the
+opened panel lists every colour as a swatch + name, with a checkmark
+on the current one. Closes on picking a colour or on outside
+click/Escape. Used both when creating a tag and when changing an
 existing one's colour afterward.
 
 | Prop | Type | Notes |

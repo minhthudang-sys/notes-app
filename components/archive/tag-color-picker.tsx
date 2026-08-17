@@ -1,6 +1,15 @@
 import * as React from "react";
+import { Check, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { TAG_COLORS, tagColorVars, type TagColor } from "@/lib/design/folder-colors";
 
 export type TagColorPickerProps = {
@@ -9,10 +18,15 @@ export type TagColorPickerProps = {
   className?: string;
 };
 
+function colorLabel(color: TagColor): string {
+  return color[0].toUpperCase() + color.slice(1);
+}
+
 /**
- * A swatch picker over the fixed TAG_COLORS palette — never a
- * freeform colour input. One round button per palette entry; the
- * selected one gets a ring.
+ * A dropdown over the fixed TAG_COLORS palette — never a freeform
+ * colour input. Swatch + name per row, a checkmark on the current
+ * colour; closes on picking one or on outside click/Escape (Radix
+ * DropdownMenu's built-in behaviour).
  */
 export function TagColorPicker({
   value,
@@ -20,28 +34,39 @@ export function TagColorPicker({
   className,
 }: TagColorPickerProps) {
   return (
-    <div
-      role="radiogroup"
-      aria-label="Tag colour"
-      className={cn("flex flex-wrap items-center gap-1.5", className)}
-    >
-      {TAG_COLORS.map((color) => (
-        <button
-          key={color}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
           type="button"
-          role="radio"
-          aria-checked={value === color}
-          aria-label={color}
-          onClick={() => onChange(color)}
-          style={tagColorVars(color)}
-          className={cn(
-            "h-5 w-5 shrink-0 rounded-full bg-tag-current transition-shadow",
-            value === color
-              ? "ring-2 ring-ring ring-offset-2 ring-offset-archive-raised"
-              : "opacity-70 hover:opacity-100",
-          )}
-        />
-      ))}
-    </div>
+          variant="outline"
+          size="sm"
+          aria-label={`Tag colour: ${colorLabel(value)}`}
+          className={cn("px-2", className)}
+        >
+          <span
+            aria-hidden="true"
+            style={tagColorVars(value)}
+            className="h-3.5 w-3.5 shrink-0 rounded-sm bg-tag-current"
+          />
+          <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 opacity-70" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel>Colours</DropdownMenuLabel>
+        {TAG_COLORS.map((color) => (
+          <DropdownMenuItem key={color} onSelect={() => onChange(color)}>
+            <span
+              aria-hidden="true"
+              style={tagColorVars(color)}
+              className="h-3.5 w-3.5 shrink-0 rounded-sm bg-tag-current"
+            />
+            {colorLabel(color)}
+            {value === color && (
+              <Check aria-hidden="true" className="ml-auto h-4 w-4" />
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
