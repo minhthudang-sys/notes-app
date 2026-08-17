@@ -1,6 +1,6 @@
--- One-time data seed: real course progress (sprints, parts, todos).
+-- One-time data seed: real course progress (sprints, parts).
 -- Idempotent — safe to re-run. Each insert skips rows that already exist
--- (matched by sprint name, (sprint, part name), and todo text respectively).
+-- (matched by sprint name and (sprint, part name)).
 
 -- Sprints
 insert into sprints (name, planned_start, planned_end)
@@ -63,12 +63,3 @@ join sprints s on s.name = v.sprint_name
 where not exists (
   select 1 from parts p where p.sprint_id = s.id and p.name = v.name
 );
-
--- Todos
-insert into todos (text, due_date, done, priority)
-select v.text, null, false, v.priority
-from (values
-  ('Build the delivery-review skill (speech/delivery analysis for Feynman sessions) — design decisions already locked in, see delivery-review-notes.md', 'low'),
-  ('[REDACTED — was a plaintext DB password, removed before commit]', 'low')
-) as v(text, priority)
-where not exists (select 1 from todos t where t.text = v.text);

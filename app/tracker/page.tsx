@@ -21,17 +21,12 @@ import { folderColorForSprint } from "@/lib/design/folder-colors";
 import {
   createPart,
   createSprint,
-  createTodo,
-  deleteTodo,
   getParts,
   getSprints,
-  getTodos,
   setPartStatus,
   setTeachBackDone,
-  setTodoDone,
   type Part,
   type Sprint,
-  type Todo,
 } from "@/lib/supabase/tracker";
 import {
   createNoteForPart,
@@ -55,7 +50,6 @@ type PartDraft = { name: string; date: string };
 export default function TrackerPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
-  const [todos, setTodos] = useState<Todo[]>([]);
   const [notesByPart, setNotesByPart] = useState<Map<string, string>>(
     new Map(),
   );
@@ -75,16 +69,11 @@ export default function TrackerPage() {
     {},
   );
 
-  const [newTodoText, setNewTodoText] = useState("");
-  const [newTodoDue, setNewTodoDue] = useState("");
-  const [newTodoPriority, setNewTodoPriority] = useState("");
-
   useEffect(() => {
-    Promise.all([getSprints(), getParts(), getTodos()])
-      .then(async ([s, p, t]) => {
+    Promise.all([getSprints(), getParts()])
+      .then(async ([s, p]) => {
         setSprints(s);
         setParts(p);
-        setTodos(t);
         const partNotes = await getNotesForParts(p.map((part) => part.id));
         setNotesByPart(
           new Map(
@@ -228,44 +217,6 @@ export default function TrackerPage() {
       const note = await createNoteForPart(part.id, part.name);
       setNotesByPart((prev) => new Map(prev).set(part.id, note.id));
       setOpenNote(note);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
-  async function handleCreateTodo(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newTodoText.trim()) return;
-    try {
-      const todo = await createTodo({
-        text: newTodoText.trim(),
-        due_date: newTodoDue || null,
-        priority: newTodoPriority || null,
-      });
-      setTodos((prev) => [...prev, todo]);
-      setNewTodoText("");
-      setNewTodoDue("");
-      setNewTodoPriority("");
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
-  async function handleToggleTodo(todo: Todo) {
-    setError(null);
-    try {
-      const updated = await setTodoDone(todo.id, !todo.done);
-      setTodos((prev) => prev.map((t) => (t.id === todo.id ? updated : t)));
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
-  async function handleDeleteTodo(id: string) {
-    setError(null);
-    try {
-      await deleteTodo(id);
-      setTodos((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -555,19 +506,6 @@ export default function TrackerPage() {
           </Button>
         )}
       </div>
-
-      <TodoDrawer
-        todos={todos}
-        text={newTodoText}
-        due={newTodoDue}
-        priority={newTodoPriority}
-        onText={setNewTodoText}
-        onDue={setNewTodoDue}
-        onPriority={setNewTodoPriority}
-        onSubmit={handleCreateTodo}
-        onToggle={handleToggleTodo}
-        onDelete={handleDeleteTodo}
-      />
     </main>
   );
 }
@@ -771,142 +709,5 @@ function CaseFile({
         )}
       </div>
     </PaperPanel>
-  );
-}
-
-/** Practical metadata: todos and their due dates. */
-function TodoDrawer({
-  todos,
-  text,
-  due,
-  priority,
-  onText,
-  onDue,
-  onPriority,
-  onSubmit,
-  onToggle,
-  onDelete,
-}: {
-  todos: Todo[];
-  text: string;
-  due: string;
-  priority: string;
-  onText: (v: string) => void;
-  onDue: (v: string) => void;
-  onPriority: (v: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onToggle: (todo: Todo) => void;
-  onDelete: (id: string) => void;
-}) {
-  return (
-    <section className="mt-12" aria-label="Todos">
-      <h2 className="font-display text-lg uppercase tracking-label text-archive-bright">
-        Pinned todos
-      </h2>
-
-      <form
-        onSubmit={onSubmit}
-        className="mt-3 flex flex-wrap items-end gap-3 border border-archive-rule bg-archive-raised p-4"
-      >
-        <div className="flex flex-col gap-1.5">
-          <Label
-            htmlFor="new-todo-text"
-            className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
-          >
-            Task
-          </Label>
-          <Input
-            id="new-todo-text"
-            value={text}
-            onChange={(e) => onText(e.target.value)}
-            placeholder="What needs doing?"
-            className="w-64 font-mono text-xs"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label
-            htmlFor="new-todo-due"
-            className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
-          >
-            Due
-          </Label>
-          <Input
-            id="new-todo-due"
-            type="date"
-            value={due}
-            onChange={(e) => onDue(e.target.value)}
-            className="font-mono text-xs"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label
-            htmlFor="new-todo-priority"
-            className="font-mono text-[10px] uppercase tracking-label text-archive-dim"
-          >
-            Priority
-          </Label>
-          <select
-            id="new-todo-priority"
-            value={priority}
-            onChange={(e) => onPriority(e.target.value)}
-            className="h-9 border border-input bg-transparent px-3 font-mono text-xs text-archive-bright"
-          >
-            <option value="">—</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-        <Button type="submit" variant="outline" size="sm">
-          Pin todo
-        </Button>
-      </form>
-
-      {todos.length === 0 ? (
-        <p className="mt-3 font-mono text-xs text-archive-dim">
-          Nothing pinned.
-        </p>
-      ) : (
-        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-          {todos.map((todo) => (
-            <PaperPanel
-              key={todo.id}
-              as="li"
-              tone={todo.done ? "shade" : "paper"}
-              className="flex items-start justify-between gap-3 p-3"
-            >
-              <label className="flex min-w-0 items-start gap-2.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={todo.done}
-                  onChange={() => onToggle(todo)}
-                  className="mt-1 shrink-0"
-                />
-                <span className="min-w-0">
-                  <span className={cn(todo.done && "line-through opacity-70")}>
-                    {todo.text}
-                  </span>
-                  {(todo.due_date || todo.priority) && (
-                    <span className="mt-1 block font-mono text-[10px] uppercase tracking-label text-ink-soft">
-                      {todo.due_date ? `Due ${todo.due_date}` : ""}
-                      {todo.due_date && todo.priority ? " · " : ""}
-                      {todo.priority ?? ""}
-                    </span>
-                  )}
-                </span>
-              </label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(todo.id)}
-                className="shrink-0 text-ink-soft hover:bg-ink/10 hover:text-ink"
-              >
-                Delete
-              </Button>
-            </PaperPanel>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }

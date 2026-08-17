@@ -8,7 +8,7 @@ const ENTRANCES = [
     href: "/tracker",
     color: "mustard" as const,
     label: "The Archive",
-    body: "Sprints as folders, chapters as filed documents. Mark chapters complete, log teach-backs, keep todos.",
+    body: "Sprints as folders, chapters as filed documents. Mark chapters complete, log teach-backs.",
   },
   {
     href: "/notes",

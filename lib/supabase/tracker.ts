@@ -25,14 +25,6 @@ export type Course = {
   target_date: string | null;
 };
 
-export type Todo = {
-  id: string;
-  text: string;
-  due_date: string | null;
-  done: boolean;
-  priority: string | null;
-};
-
 export async function getSprints(): Promise<Sprint[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -124,53 +116,6 @@ export async function setTeachBackDone(
 
   if (error) throw error;
   return data;
-}
-
-export async function getTodos(): Promise<Todo[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("todos")
-    .select("*")
-    .order("due_date", { ascending: true, nullsFirst: false });
-
-  if (error) throw error;
-  return data;
-}
-
-export async function createTodo(todo: {
-  text: string;
-  due_date: string | null;
-  priority: string | null;
-}): Promise<Todo> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("todos")
-    .insert(todo)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function setTodoDone(id: string, done: boolean): Promise<Todo> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("todos")
-    .update({ done })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function deleteTodo(id: string): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase.from("todos").delete().eq("id", id);
-
-  if (error) throw error;
 }
 
 export async function getCourse(): Promise<Course> {

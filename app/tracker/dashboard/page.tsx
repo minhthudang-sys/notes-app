@@ -18,11 +18,9 @@ import {
   getCourse,
   getParts,
   getSprints,
-  getTodos,
   type Course,
   type Part,
   type Sprint,
-  type Todo,
 } from "@/lib/supabase/tracker";
 import {
   builtUnitsOf,
@@ -49,7 +47,6 @@ const COURSE_STATUSES = {
 export default function DashboardPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
-  const [todos, setTodos] = useState<Todo[]>([]);
   const [course, setCourse] = useState<Course | null>(null);
   // Read in an effect, not at render time — Next's prerender flags
   // `new Date()` reached during a client component's initial render.
@@ -58,11 +55,10 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getSprints(), getParts(), getTodos(), getCourse()])
-      .then(([s, p, t, c]) => {
+    Promise.all([getSprints(), getParts(), getCourse()])
+      .then(([s, p, c]) => {
         setSprints(s);
         setParts(p);
-        setTodos(t);
         setCourse(c);
         setToday(new Date().toISOString().slice(0, 10));
       })
@@ -117,14 +113,6 @@ export default function DashboardPage() {
   const reviewQueue = useMemo(
     () => parts.filter((p) => p.status === "completed" && !p.teach_back_done),
     [parts],
-  );
-
-  const openTodos = useMemo(
-    () =>
-      [...todos]
-        .filter((t) => !t.done)
-        .sort((a, b) => (a.due_date ?? "9999-99-99").localeCompare(b.due_date ?? "9999-99-99")),
-    [todos],
   );
 
   if (loading) {
@@ -227,74 +215,46 @@ export default function DashboardPage() {
         </div>
       </PaperPanel>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Open to-dos */}
-        <PaperPanel tooth className="p-5">
-          <h2 className="font-display text-lg uppercase tracking-label">
-            Open to-dos
-          </h2>
-          {openTodos.length === 0 ? (
-            <p className="mt-3 text-xs text-ink-soft">Nothing pinned.</p>
-          ) : (
-            <ul className="mt-3 flex flex-col gap-2">
-              {openTodos.map((todo) => (
-                <li
-                  key={todo.id}
-                  className="flex items-baseline justify-between gap-3 border-t border-paper-edge pt-2 text-sm first:border-t-0 first:pt-0"
-                >
-                  <span className="min-w-0 truncate">{todo.text}</span>
-                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-label text-ink-soft">
-                    {todo.due_date ? `Due ${todo.due_date}` : ""}
-                    {todo.due_date && todo.priority ? " · " : ""}
-                    {todo.priority ?? ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </PaperPanel>
-
-        {/* Review queue: completed parts still waiting on a teach-back */}
-        <PaperPanel tooth className="p-5">
-          <h2 className="font-display text-lg uppercase tracking-label">
-            Review queue
-          </h2>
-          <p className="mt-1 text-xs text-ink-soft">
-            Completed parts still waiting on a teach-back.
+      {/* Review queue: completed parts still waiting on a teach-back */}
+      <PaperPanel tooth className="p-5">
+        <h2 className="font-display text-lg uppercase tracking-label">
+          Review queue
+        </h2>
+        <p className="mt-1 text-xs text-ink-soft">
+          Completed parts still waiting on a teach-back.
+        </p>
+        {reviewQueue.length === 0 ? (
+          <p className="mt-3 text-xs text-ink-soft">
+            Nothing waiting — you&apos;re caught up.
           </p>
-          {reviewQueue.length === 0 ? (
-            <p className="mt-3 text-xs text-ink-soft">
-              Nothing waiting — you&apos;re caught up.
-            </p>
-          ) : (
-            <ul className="mt-3 flex flex-col gap-2">
-              {reviewQueue.map((part) => {
-                const sprint = sprints.find((s) => s.id === part.sprint_id);
-                return (
-                  <li
-                    key={part.id}
-                    className="flex items-center justify-between gap-3 border-t border-paper-edge pt-2 text-sm first:border-t-0 first:pt-0"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate">{part.name}</span>
-                      {sprint && (
-                        <span className="block font-mono text-[10px] uppercase tracking-label text-ink-soft">
-                          {sprint.name}
-                        </span>
-                      )}
-                    </span>
-                    <StatusStamp
-                      surface="paper"
-                      status="pending"
-                      statuses={TEACH_BACK_STATUSES}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </PaperPanel>
-      </div>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-2">
+            {reviewQueue.map((part) => {
+              const sprint = sprints.find((s) => s.id === part.sprint_id);
+              return (
+                <li
+                  key={part.id}
+                  className="flex items-center justify-between gap-3 border-t border-paper-edge pt-2 text-sm first:border-t-0 first:pt-0"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate">{part.name}</span>
+                    {sprint && (
+                      <span className="block font-mono text-[10px] uppercase tracking-label text-ink-soft">
+                        {sprint.name}
+                      </span>
+                    )}
+                  </span>
+                  <StatusStamp
+                    surface="paper"
+                    status="pending"
+                    statuses={TEACH_BACK_STATUSES}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </PaperPanel>
 
       {/* Sprint progress — weighted units, not raw part counts */}
       <PaperPanel tooth className="mt-6 p-5">
