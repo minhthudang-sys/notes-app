@@ -10,6 +10,7 @@ an explicit stop condition, so there's never a contradiction between "what to bu
 | 1 | Notes CRUD | Prove Supabase persistence works at all |
 | 2 | Collections, tags, search | Completes the graded assignment |
 | 3 | Study model + chapter→summary link | Sprints/parts/todos + `part_id` on notes |
+| — | *Seed real course data* | *Run between 3 and 4 — see note below* |
 | 4 | Folder UI foundation | Design tokens + component library, before more UI exists |
 | 5 | Course config + weighted projection engine | Built correctly once — no provisional math |
 | 6 | Dashboard and simple timeline | Composed from prompt 4's components, prompt 5's real numbers |
@@ -52,6 +53,28 @@ Flag it if that's wrong.)
 - `dashboard-template.html` — a static mockup of the dashboard views, referenced by
   prompt 6 for **information architecture and copy only**. Its visual styling predates
   the folder/case-file design language; prompt 4's tokens win where they conflict.
+
+## Data is seeded early, between prompt 3 and prompt 4
+
+The unnumbered "Seed" prompt below (real course progress: 6 sprints, 34 parts, 2
+todos) runs right after prompt 3, before the visual work starts. Reasoning: prompt 4
+asks the agent to derive "the current sprint" from
+real data, which isn't actually verifiable against an empty database — and every
+prompt after that (projections, dashboard, review workflow, the final audit) is far
+more meaningful to build and check against real numbers than against placeholders.
+
+This has two knock-on effects, both already folded into the prompts below:
+
+- **Prompt 5** adds `kind` to `parts` with existing rows defaulting to `part` — but 10
+  of the 34 already-seeded rows aren't actually kind `part` (they're mid-projects,
+  sprint projects, the career module, and the capstone). Left at the default, the
+  weighted-effort numbers would be wrong from the very first run of the dashboard.
+  Prompt 5 now explicitly reclassifies those rows by name.
+- **Prompt 7** adds the `project_reviews` table — and Sprint 1's project already has a
+  real, known review (score 92, reviewer Jochen Zuegge, submitted 2026-08-04, passed
+  2026-08-05). Without backfilling it, "measured review turnaround" would report
+  "assumed" despite real data existing. Prompt 7 now inserts that one record as part
+  of standing up the table.
 
 ---
 
@@ -188,9 +211,147 @@ Definition of done for this run:
 - I can filter the notes list down to a single sprint or a single part.
 - A note with no part_id still works normally.
 
-I'll enter my real sprint/part data by hand once this exists — no import needed.
+Real sprint/part data gets inserted next, via a separate seed prompt — no import
+logic needed here.
 
 Finish by reporting what you verified and what's left.
+```
+
+---
+
+## Seed — Insert real course progress
+
+```
+Paste this into the agent working on notes-app. Assumes Prompt 3 (sprints/parts/todos
++ the chapter→summary link) is already built. Task for this run only: insert the
+following real data into the existing tables. No schema changes, no new features —
+pure data entry.
+
+## Do
+
+- Use the existing tracker/notes helper functions to create these rows — a one-off
+  seed script that calls the existing createSprint()/createPart()/createTodo()-style
+  functions, or an idempotent SQL seed file. Don't bypass the helper module if
+  equivalent functions already exist.
+- Insert sprints first, then their parts, then the todos.
+- Make it safe to re-run without creating duplicates (e.g. skip a sprint if one with
+  this name already exists) — I may need to re-run this.
+
+## Sprints (name, planned_start, planned_end)
+
+| Sprint | planned_start | planned_end |
+|---|---|---|
+| Sprint 1 — Claude Code Foundations & Simple Applications | 2026-07-22 | 2026-08-05 |
+| Sprint 2 — Databases, Deployment & Full-Stack Apps | 2026-08-06 | 2026-09-18 |
+| Sprint 3 — Security, Testing & AI Apps | 2026-09-19 | 2026-10-14 |
+| Sprint 4 — Advanced Builds: Mobile, Commerce & Production | 2026-10-15 | 2026-11-16 |
+| Career Module — Building with AI Agents | 2026-11-17 | 2026-11-18 |
+| Capstone — Building with AI Agents | 2026-11-19 | 2026-11-20 |
+
+(Each sprint's window runs from the previous sprint's end + 1 day to its own platform
+deadline — that's the actual Turing College schedule, not an estimate.)
+
+## Parts, per sprint
+
+Status is only ever `open` or `completed` — nothing else exists at this stage.
+`planned_completion_date` is `null` for every single part below — it was never tracked
+at this granularity, only at the sprint level above, so there's nothing real to put
+there. `actual_completion_date` is filled in only where noted; leave it `null`
+everywhere else. `teach_back_done` is `false` for every part, including completed
+ones — no teach-back has actually been done yet.
+
+### Sprint 1 — Claude Code Foundations & Simple Applications (all completed)
+
+1. Why use Claude Code? — completed — actual_completion_date 2026-08-05
+2. Setup and Getting Started — completed — actual_completion_date 2026-08-05
+3. Agent Mode Memory and Follow-Up Prompting — completed — actual_completion_date 2026-08-05
+4. Git, GitHub and Deploying a Static App — completed — actual_completion_date 2026-08-05
+5. Practice Project: Build Your Own Web App and Deploy It — completed — actual_completion_date 2026-08-05
+6. Intro to Web Applications and Next.js — completed — actual_completion_date 2026-08-05
+7. Context Engineering and Web Search — completed — actual_completion_date 2026-08-05
+8. Sprint Project: Build a Simple Next.js App — completed — actual_completion_date 2026-08-05
+
+All eight backfilled to the sprint's own completion date (2026-08-05) — the most
+accurate date actually known, since per-part dates within the sprint weren't tracked.
+
+### Sprint 2 — Databases, Deployment & Full-Stack Apps (parts 1-7 completed, project open)
+
+1. Claude Code Slash Commands — completed — actual_completion_date null
+2. Agent Skills and Plugins — completed — actual_completion_date null
+3. Intro to Databases and Supabase — completed — actual_completion_date null
+4. Next.js with Supabase — completed — actual_completion_date null
+5. Mid-Sprint Project: Notes App with Collections and Search — completed — actual_completion_date null
+6. Authentication with Supabase — completed — actual_completion_date null
+7. Fixing errors and debugging with Claude Code — completed — actual_completion_date null
+8. Sprint Project: Full-Stack App with Database and Authentication — open — actual_completion_date null
+
+`actual_completion_date` is null across all eight here — Sprint 2 isn't marked
+complete yet, so there's no sprint-level date to borrow. Part 8 is the one currently
+being worked on.
+
+### Sprint 3 — Security, Testing & AI Apps (all open)
+
+1. Subagents and Superpowers — open
+2. Intro to Vercel and Deploying Full-Stack Apps — open
+3. Security of web apps — open
+4. MCP, Browser Use, and Automated Tests with Playwright — open
+5. Mid-Sprint Project: Ship a Secured App and Prove It — open
+6. Building AI apps — open
+7. RAG: chat with your own data — open
+8. Sprint Project: Ship an AI App of Your Own — open
+
+### Sprint 4 — Advanced Builds: Mobile, Commerce & Production (all open)
+
+1. Automations with Claude Code — open
+2. Compliance for AI Builders — open
+3. Building Mobile Apps: Expo and React Native — open
+4. Mid-Sprint Project: Build a Mobile App with an AI Feature — open
+5. Multitasking and loop engineering — open
+6. Building a CMS and Integrating Payments — open
+7. Building production systems — open
+8. Sprint Project: Ship Your Own Online Shop — open
+
+### Career Module — Building with AI Agents (open)
+
+1. Career Module — open
+
+### Capstone — Building with AI Agents (open)
+
+1. Building with AI Agents Capstone — open
+
+34 parts total across the six sprints (8+8+8+8+1+1).
+
+## Todos
+
+| text | due_date | done | priority |
+|---|---|---|---|
+| Build the delivery-review skill (speech/delivery analysis for Feynman sessions) — design decisions already locked in, see delivery-review-notes.md | null | false | low |
+| -Z-TYpW7smwnzR# | null | false | low |
+
+Note on the second todo: this reads like a generated password or credential rather
+than a task description. I'm inserting it as literal text at explicit instruction —
+if it's a real credential, treat it as exposed and rotate it now that it lives as
+plain text in a database, not just a local JSON file.
+
+## Don't
+
+- Don't change the schema, add columns, or add any feature.
+- Don't touch the notes app, collections, tags, or search.
+- Don't flip `teach_back_done` to true for any part, including the ones marked
+  completed above — that stays false for everything until a real teach-back happens.
+
+## Definition of done
+
+- All 6 sprints and their 34 parts exist in Supabase, matching the tables above
+  exactly — including which `actual_completion_date` values are set vs. left null.
+- Both todos exist, matching the table above.
+- Re-running the script doesn't create duplicates.
+- Opening the study-tracker UI shows: Sprint 1 fully complete, Sprint 2 parts 1-7
+  complete with the sprint project still open, Sprints 3-4/career/capstone entirely
+  open, no teach-backs marked done anywhere.
+
+Finish by reporting what you inserted and confirming the counts (6 sprints, 34 parts,
+2 todos).
 ```
 
 ---
@@ -398,10 +559,29 @@ later" pass. No UI work beyond a bare debug view.
 - Add a `kind` column to `parts`: one of `part`, `mid_project`, `project`,
   `career`, `capstone`. Migrate existing rows to default to `part` — this must
   not break data from prompt 3.
+- Real sprint/part data is already seeded (from seed-data-prompt.md). After the
+  migration, update `kind` on these already-existing rows by name, since they'd
+  otherwise incorrectly stay at the `part` default:
+  - `kind = 'mid_project'`: "Practice Project: Build Your Own Web App and Deploy
+    It", "Mid-Sprint Project: Notes App with Collections and Search",
+    "Mid-Sprint Project: Ship a Secured App and Prove It", "Mid-Sprint Project:
+    Build a Mobile App with an AI Feature"
+  - `kind = 'project'`: "Sprint Project: Build a Simple Next.js App", "Sprint
+    Project: Full-Stack App with Database and Authentication", "Sprint Project:
+    Ship an AI App of Your Own", "Sprint Project: Ship Your Own Online Shop"
+  - `kind = 'career'`: "Career Module"
+  - `kind = 'capstone'`: "Building with AI Agents Capstone"
+  - Everything else stays `part`, which is already correct at the default.
 - Add a weights configuration mapping kind → weight, in one place (a settings
   table or a constants file, your call) — not hardcoded inline wherever it's
-  used. Starting values: part=1, mid_project=1.5, project=2, career=1,
-  capstone=3.
+  used. Starting values:
+  | kind | weight |
+  |---|---|
+  | part (reading part) | 1 |
+  | mid_project (mid-sprint project) | 1.5 |
+  | project (sprint project) | 2 |
+  | career (career module) | 1 |
+  | capstone | 3 |
 - Add a course-level `target_date` (the personal deadline). A second,
   platform-mandated deadline is added later (prompt 8) — just this one for now.
 
@@ -553,6 +733,13 @@ Do:
   record per project/capstone part), status (submitted | in_review |
   corrections | passed), reviewer, score, rubric (jsonb), review_notes,
   submitted_on, passed_on.
+- Backfill one real row: Sprint 1's "Sprint Project: Build a Simple Next.js
+  App" already has a completed, known review — status 'passed', reviewer
+  "Jochen Zuegge", score 92, submitted_on 2026-08-04, passed_on 2026-08-05.
+  Leave rubric and review_notes null unless I provide them later. Insert this
+  as part of standing up the table, the same way seed-data-prompt.md backfilled
+  the sprints and parts — without it, "measured review turnaround" below would
+  report "assumed" despite a real data point existing.
 - UI: for a project/capstone part, show its review status using `StatusStamp`
   from prompt 4 with this review-status set (it was built to accept an
   arbitrary status set for exactly this reuse). Show this alongside, not
