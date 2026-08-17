@@ -18,6 +18,7 @@ an explicit stop condition, so there's never a contradiction between "what to bu
 | 8 | What-if controls + advanced timeline | Depends on prompt 7's review-turnaround data |
 | 9 | **Final responsive, accessibility, and regression audit** | Runs last, so nothing built in 7–8 escapes it |
 | — | *Optional: Colour-coded tags* | *Independent of the tracker — can run any time after Prompt 2. See the end of this doc.* |
+| — | *Optional: Server-side full-text search* | *Also independent of the tracker — see the note below on why it may already be done.* |
 
 ## Two corrections from the previous version of this doc
 
@@ -949,4 +950,87 @@ Definition of done for this run:
   not committed directly to main.
 
 Finish by reporting what you verified, the branch name, and the PR link/number.
+```
+
+---
+
+## Optional — Server-side full-text search
+
+Flag before using this one: Prompt 2 already specified server-side full-text search
+— a generated `tsvector` over title + body, a GIN index, queried via Supabase's
+`.textSearch()` — which is exactly what this optional task asks for. Whether this is
+still a meaningful additional task depends on whether Prompt 2 was actually built to
+that spec. The prompt below audits that first and branches accordingly, so it's
+useful either way: if Prompt 2 already did it correctly, this becomes a hardening +
+proof-of-performance pass (ranking, an EXPLAIN-verified index, a demonstrated result
+at a few thousand rows) rather than an empty PR; if search actually drifted to
+client-side filtering somewhere, this does the real move-to-server work.
+
+If you only want to submit one optional task for the assignment, colour-coded tags
+above is the safer choice precisely because it can't turn out to be redundant. Use
+this one instead of, or in addition to, that one — your call.
+
+```
+You're working in the existing notes-app. Notes, collections, tags, and search
+(Prompt 2) are already working.
+
+Task for this run only: make sure full-text search genuinely runs server-side, is
+properly indexed, ranks by relevance, and demonstrably stays fast at scale. This is
+an optional task for the assignment — do all of this on a dedicated feature branch,
+and open a pull request against main rather than committing directly. Don't merge it
+yourself; leave the PR open for me to review.
+
+First, audit before changing anything:
+- Read the current search code path end to end — from the search box's input handler
+  through to the database. Confirm whether it already executes as a database query
+  using a `tsvector` column + GIN index via Supabase's `.textSearch()` (per Prompt
+  2's original spec), or whether it fetches notes to the browser and filters/matches
+  them in JavaScript.
+- Report which one it actually is before doing anything else — this determines the
+  rest of the work.
+
+If it's already server-side (Prompt 2's spec was followed) — harden and prove it:
+- Confirm the GIN index exists and is actually used: run EXPLAIN ANALYZE on a
+  representative search query and check for an index scan, not a sequential scan.
+  Include the output in your final report.
+- Add relevance ranking if it isn't there already — order results by `ts_rank` or
+  `ts_rank_cd`, not just an unordered set of matches.
+- Prove it holds up "even with thousands of notes," as the task requires: seed a
+  batch of a few thousand synthetic notes via a throwaway script, run a representative
+  search, and report the query time and EXPLAIN output before and after. Clean up
+  the synthetic data afterward — don't leave it polluting the real notes list.
+
+If it's actually client-side (search drifted from Prompt 2's spec) — move it:
+- Add a generated `tsvector` column over title + body if one doesn't exist, with a
+  GIN index.
+- Replace the client-side filtering with a query using Supabase's `.textSearch()`
+  (or an RPC using `websearch_to_tsquery`/`plainto_tsquery`), so matching happens in
+  Postgres, not in the browser.
+- Then do the same hardening and scale-proof steps listed above.
+
+Either way:
+- The user-facing behaviour doesn't change — typing in the search box still narrows
+  the list live, same as before. This is a backend/performance change only.
+- Don't touch collection or tag filtering logic, or any visual/UI styling — this
+  isn't a Prompt 4 restyling opportunity.
+
+Don't:
+- Don't leave synthetic performance-test notes in the real data after you're done
+  proving performance.
+- Don't change how collections/tags filter, or anything on the study-tracker side.
+- Don't merge the PR yourself.
+
+Definition of done for this run:
+- You've reported which case applied — already server-side, or moved from
+  client-side — before describing what you changed.
+- Search executes as a database query against an indexed `tsvector` column, verified
+  via EXPLAIN showing an index scan.
+- Results are ranked by relevance.
+- Documented evidence of performance at a few-thousand-row scale is included in the
+  PR description, and no leftover synthetic data remains in the real notes table.
+- The user-facing search box behaves exactly as before.
+- The work is on its own feature branch, with a pull request open against main.
+
+Finish by reporting which case applied, what you changed (if anything), the EXPLAIN
+output, the performance numbers, the branch name, and the PR link/number.
 ```

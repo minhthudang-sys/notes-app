@@ -50,6 +50,15 @@ export default {
           teal: "hsl(var(--folder-teal) / <alpha-value>)",
         },
 
+        /*
+         * `tag-current` resolves whichever tag colour the nearest
+         * ancestor set via tagColorVars() — same convention as
+         * `folder-current`, kept separate so the two never collide.
+         */
+        tag: {
+          current: "hsl(var(--tag-current) / <alpha-value>)",
+        },
+
         /* shadcn/ui contract — see globals.css */
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",

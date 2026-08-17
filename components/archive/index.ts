@@ -11,3 +11,5 @@ export {
   type StatusDefinition,
   type StampTone,
 } from "./status-stamp";
+export { TagBadge, type TagBadgeProps } from "./tag-badge";
+export { TagColorPicker, type TagColorPickerProps } from "./tag-color-picker";

@@ -46,6 +46,12 @@
      * component rendered outside a Folder still resolves. */
     --folder-current: var(--folder-blue);
 
+    /* Set per-tag by tagColorVars(); reuses the folder hues above
+     * (see TAG_COLORS in lib/design/folder-colors.ts) via its own
+     * variable, so a tag badge never clobbers an ancestor folder's
+     * --folder-current. Defaults to blue for the same reason. */
+    --tag-current: var(--folder-blue);
+
     /* --- shape --- */
     --radius: 0.125rem;
 
