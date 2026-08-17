@@ -326,7 +326,7 @@ being worked on.
 | text | due_date | done | priority |
 |---|---|---|---|
 | Build the delivery-review skill (speech/delivery analysis for Feynman sessions) — design decisions already locked in, see delivery-review-notes.md | null | false | low |
-| -Z-TYpW7smwnzR# | null | false | low |
+| [REDACTED — was a plaintext DB password, removed before commit] | null | false | low |
 
 Note on the second todo: this reads like a generated password or credential rather
 than a task description. I'm inserting it as literal text at explicit instruction —
