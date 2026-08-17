@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,12 @@ import {
   type NoteWithRelations,
   type Tag,
 } from "@/lib/supabase/notes";
+import {
+  getParts,
+  getSprints,
+  type Part,
+  type Sprint,
+} from "@/lib/supabase/tracker";
 
 const textareaClassName = cn(
   "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
@@ -42,9 +49,21 @@ function toggleId(ids: string[], id: string): string[] {
 }
 
 export default function NotesPage() {
+  return (
+    <Suspense>
+      <NotesPageContent />
+    </Suspense>
+  );
+}
+
+function NotesPageContent() {
+  const searchParams = useSearchParams();
+
   const [notes, setNotes] = useState<NoteWithRelations[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,16 +84,33 @@ export default function NotesPage() {
 
   const [filterCollectionId, setFilterCollectionId] = useState("");
   const [filterTagId, setFilterTagId] = useState("");
+  const [filterSprintId, setFilterSprintId] = useState("");
+  const [filterPartId, setFilterPartId] = useState(
+    () => searchParams.get("partId") ?? "",
+  );
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
 
   async function loadNotes() {
     setError(null);
     try {
+      let partIds: string[] | undefined;
+      if (filterSprintId) {
+        const sprintParts = await getParts(filterSprintId);
+        partIds = sprintParts.map((p) => p.id);
+        if (partIds.length === 0) {
+          setNotes([]);
+          setLoading(false);
+          return;
+        }
+      }
+
       const data = await getNotes({
         collectionId: filterCollectionId || undefined,
         tagId: filterTagId || undefined,
         search: appliedSearch || undefined,
+        partId: filterPartId || undefined,
+        partIds,
       });
       setNotes(data);
     } catch (err) {
@@ -85,10 +121,12 @@ export default function NotesPage() {
   }
 
   useEffect(() => {
-    Promise.all([getCollections(), getTags()])
-      .then(([c, t]) => {
+    Promise.all([getCollections(), getTags(), getSprints(), getParts()])
+      .then(([c, t, s, p]) => {
         setCollections(c);
         setTags(t);
+        setSprints(s);
+        setParts(p);
       })
       .catch((err) => setError(err.message));
   }, []);
@@ -96,7 +134,7 @@ export default function NotesPage() {
   useEffect(() => {
     loadNotes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterCollectionId, filterTagId, appliedSearch]);
+  }, [filterCollectionId, filterTagId, appliedSearch, filterSprintId, filterPartId]);
 
   async function handleCreateCollection(e: React.FormEvent) {
     e.preventDefault();
@@ -276,6 +314,47 @@ export default function NotesPage() {
             {tags.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="filter-sprint">Sprint</Label>
+          <select
+            id="filter-sprint"
+            className={selectClassName}
+            value={filterSprintId}
+            onChange={(e) => {
+              setFilterSprintId(e.target.value);
+              setFilterPartId("");
+            }}
+          >
+            <option value="">All sprints</option>
+            {sprints.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="filter-part">Part</Label>
+          <select
+            id="filter-part"
+            className={selectClassName}
+            value={filterPartId}
+            onChange={(e) => {
+              setFilterPartId(e.target.value);
+              setFilterSprintId("");
+            }}
+          >
+            <option value="">All parts</option>
+            {parts.map((p) => (
+              <option key={p.id} value={p.id}>
+                {sprints.find((s) => s.id === p.sprint_id)?.name ?? "?"} —{" "}
+                {p.name}
               </option>
             ))}
           </select>
