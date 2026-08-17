@@ -15,7 +15,7 @@ import { Folder, FolderTab, PaperPanel, MetadataLabel, StatusStamp } from "@/com
 |---|---|
 | Colour, type, radius tokens | `app/globals.css` (`:root`) |
 | Exposing tokens to Tailwind | `tailwind.config.ts` |
-| Folder palette + sprint → colour | `lib/design/folder-colors.ts` |
+| Folder palette + sprint → colour, tag palette | `lib/design/folder-colors.ts` |
 | Fonts | `app/layout.tsx` (`next/font`) |
 
 Restyle the app by editing `app/globals.css`. Components hardcode no
@@ -34,6 +34,19 @@ data-driven.
 Sprint colours are derived, not stored: `folderColorForSprint(sprint)`
 hashes `sprint.id` into the palette, so a new sprint gets a stable
 colour with no schema change and no component edit.
+
+### The `--tag-current` convention
+
+Same idea, a separate variable: `TagBadge` and `TagColorPicker` call
+`tagColorVars(color)`, which publishes `--tag-current` (not
+`--folder-current`) so a tag badge nested inside a folder-coloured
+card never clobbers the card's colour. `TAG_COLORS` is the *same*
+fixed hues as `FOLDER_COLORS` — not a second one-off palette — kept
+distinguishable from folder colours by how it's used: a folder
+colour-blocks a whole card, a tag colour only ever shows as the small
+dot in `TagBadge`/`TagColorPicker`. Unlike a sprint's folder colour, a
+tag's colour is stored (`tags.color` in Supabase), since it's user-set
+at creation and changeable afterward, not derived.
 
 ## Components
 
@@ -110,6 +123,27 @@ stamp showing the raw value.
 
 Shipped sets: `PART_STATUSES` (`open`/`completed`) and
 `TEACH_BACK_STATUSES` (`pending`/`done`).
+
+### `TagBadge`
+
+A tag's name with a small colour dot, never a colour-blocked surface.
+
+| Prop | Type | Notes |
+|---|---|---|
+| `name` | `string` | Rendered as `#name` |
+| `color` | `TagColor` | From `tags.color` |
+| `surface` | `"dark" \| "paper"` | Keeps contrast correct |
+
+### `TagColorPicker`
+
+A swatch picker over the fixed `TAG_COLORS` palette — no freeform
+colour input. Used both when creating a tag and when changing an
+existing one's colour afterward.
+
+| Prop | Type | Notes |
+|---|---|---|
+| `value` | `TagColor` | |
+| `onChange` | `(color: TagColor) => void` | |
 
 > Parts have exactly two statuses — `open` and `completed` — and that
 > does not change. A richer review lifecycle for project/capstone work

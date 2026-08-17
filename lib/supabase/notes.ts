@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import type { TagColor } from "@/lib/design/folder-colors";
 
 export type Note = {
   id: string;
@@ -18,6 +19,7 @@ export type Collection = {
 export type Tag = {
   id: string;
   name: string;
+  color: TagColor;
   created_at: string;
 };
 
@@ -214,11 +216,27 @@ export async function getTags(): Promise<Tag[]> {
   return data;
 }
 
-export async function createTag(name: string): Promise<Tag> {
+export async function createTag(name: string, color: TagColor): Promise<Tag> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("tags")
-    .insert({ name })
+    .insert({ name, color })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateTagColor(
+  id: string,
+  color: TagColor,
+): Promise<Tag> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("tags")
+    .update({ color })
+    .eq("id", id)
     .select()
     .single();
 

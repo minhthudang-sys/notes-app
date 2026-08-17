@@ -7,8 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { MetadataLabel, PaperPanel } from "@/components/archive";
-import { folderColorForSprint } from "@/lib/design/folder-colors";
+import { MetadataLabel, PaperPanel, TagBadge, TagColorPicker } from "@/components/archive";
+import {
+  DEFAULT_TAG_COLOR,
+  folderColorForSprint,
+  type TagColor,
+} from "@/lib/design/folder-colors";
 import {
   createCollection,
   createNote,
@@ -20,6 +24,7 @@ import {
   setNoteCollections,
   setNoteTags,
   updateNote,
+  updateTagColor,
   type Collection,
   type NoteWithRelations,
   type Tag,
@@ -65,6 +70,7 @@ function NotesPageContent() {
 
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState<TagColor>(DEFAULT_TAG_COLOR);
 
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
@@ -168,11 +174,31 @@ function NotesPageContent() {
     e.preventDefault();
     if (!newTagName.trim()) return;
     try {
-      const tag = await createTag(newTagName.trim());
+      const tag = await createTag(newTagName.trim(), newTagColor);
       setTags((prev) =>
         [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)),
       );
       setNewTagName("");
+      setNewTagColor(DEFAULT_TAG_COLOR);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function handleChangeTagColor(tagId: string, color: TagColor) {
+    setError(null);
+    try {
+      const updated = await updateTagColor(tagId, color);
+      setTags((prev) => prev.map((t) => (t.id === tagId ? updated : t)));
+      // Notes already loaded carry their own copies of each tag (joined at
+      // fetch time), so the colour change won't show on filed papers until
+      // the next reload unless those copies are patched too.
+      setNotes((prev) =>
+        prev.map((n) => ({
+          ...n,
+          tags: n.tags.map((t) => (t.id === tagId ? updated : t)),
+        })),
+      );
     } catch (err) {
       setError((err as Error).message);
     }
@@ -322,24 +348,35 @@ function NotesPageContent() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="filter-tag" className={captionClassName}>
-              Label
-            </Label>
-            <select
-              id="filter-tag"
-              className={fieldClassName}
-              value={filterTagId}
-              onChange={(e) => setFilterTagId(e.target.value)}
-            >
-              <option value="">All tags</option>
+          <fieldset className="flex min-w-0 flex-col gap-1.5">
+            <legend className={captionClassName}>Label</legend>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setFilterTagId("")}
+                className={cn(
+                  "border px-2 py-1 font-mono text-[10px] uppercase tracking-label",
+                  filterTagId === ""
+                    ? "border-archive-bright text-archive-bright"
+                    : "border-archive-rule text-archive-dim",
+                )}
+              >
+                All tags
+              </button>
               {tags.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setFilterTagId(t.id)}
+                  className={cn(
+                    filterTagId === t.id && "ring-1 ring-archive-bright",
+                  )}
+                >
+                  <TagBadge name={t.name} color={t.color} />
+                </button>
               ))}
-            </select>
-          </div>
+            </div>
+          </fieldset>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="filter-sprint" className={captionClassName}>
@@ -420,11 +457,30 @@ function NotesPageContent() {
                 className={cn(fieldClassName, "w-40")}
               />
             </div>
+            <TagColorPicker value={newTagColor} onChange={setNewTagColor} />
             <Button type="submit" variant="outline" size="sm">
               Add
             </Button>
           </form>
         </div>
+
+        {/* Existing labels' colours, changeable after creation */}
+        {tags.length > 0 && (
+          <div className="mt-4 flex flex-col gap-2 border-t border-archive-rule pt-4">
+            <span className={captionClassName}>Label colours</span>
+            <div className="flex flex-col gap-2">
+              {tags.map((t) => (
+                <div key={t.id} className="flex flex-wrap items-center gap-3">
+                  <TagBadge name={t.name} color={t.color} />
+                  <TagColorPicker
+                    value={t.color}
+                    onChange={(color) => handleChangeTagColor(t.id, color)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* File a new paper */}
@@ -596,12 +652,12 @@ function NotesPageContent() {
                             </span>
                           ))}
                           {note.tags.map((t) => (
-                            <span
+                            <TagBadge
                               key={t.id}
-                              className="border border-dashed border-ink/40 px-2 py-0.5 font-mono text-[10px] text-ink-soft"
-                            >
-                              #{t.name}
-                            </span>
+                              name={t.name}
+                              color={t.color}
+                              surface="paper"
+                            />
                           ))}
                         </div>
                       )}

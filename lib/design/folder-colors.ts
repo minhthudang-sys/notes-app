@@ -47,3 +47,28 @@ export function folderColorForSprint(sprint: { id: string }): FolderColor {
 export function folderColorVars(color: FolderColor): CSSProperties {
   return { "--folder-current": `var(--folder-${color})` } as CSSProperties;
 }
+
+/**
+ * The tag palette. Deliberately the *same* fixed hues as
+ * FOLDER_COLORS, not a separate one-off set — a tag colour and a
+ * sprint folder colour are drawn from one restrained archive
+ * palette, so they read as the same visual language. They stay
+ * distinguishable in context, not by hue: a folder colour-blocks a
+ * whole card, while a tag colour only ever shows as a small dot or
+ * pill (see `TagBadge`), never a full surface.
+ */
+export const TAG_COLORS = FOLDER_COLORS;
+
+export type TagColor = FolderColor;
+
+export const DEFAULT_TAG_COLOR: TagColor = "blue";
+
+/**
+ * Inline style that points `--tag-current` at one palette entry —
+ * same convention as `folderColorVars`, kept as its own CSS variable
+ * (rather than reusing `--folder-current`) so a tag badge nested
+ * inside a folder-coloured card doesn't clobber the card's colour.
+ */
+export function tagColorVars(color: TagColor): CSSProperties {
+  return { "--tag-current": `var(--folder-${color})` } as CSSProperties;
+}
