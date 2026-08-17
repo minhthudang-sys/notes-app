@@ -3,7 +3,10 @@
 # pasted into docs/agent-prompts.md from an external, unrelated project.
 # See docs/data-sources.md for the full story.
 
-if git diff --cached | grep -q -- '-Z-TYpW7smwnzR#'; then
+# Split so this file never contains the literal string itself — otherwise
+# every future commit touching this hook would self-trigger the check.
+BAD='-Z-TYpW7'"smwnzR#"
+if git diff --cached | grep -qF -- "$BAD"; then
   echo "pre-commit: blocked — staged changes contain the known leaked string." >&2
   echo "See docs/data-sources.md — don't draft this file's content from" >&2
   echo "external sources. If this is a false positive, commit with --no-verify." >&2
