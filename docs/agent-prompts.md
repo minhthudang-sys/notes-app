@@ -5,6 +5,11 @@ own "definition of done" before pasting the next. Each prompt is self-contained 
 an explicit stop condition, so there's never a contradiction between "what to build" and
 "where to stop."
 
+**This repo is self-contained — see `docs/data-sources.md` before adding a new
+section here.** Don't draft or copy content into this file from any project
+outside this repo (including the separate "Turing College - Study workspace"
+tool) — everything this file needs already lives in this repo.
+
 | # | Prompt | Why here |
 |---|---|---|
 | 1 | Notes CRUD | Prove Supabase persistence works at all |
