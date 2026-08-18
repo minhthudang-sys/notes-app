@@ -123,8 +123,10 @@ export async function getCourse(): Promise<Course> {
   const { data, error } = await supabase
     .from("course")
     .select("target_date")
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
-  return data;
+  // No row yet for this user (nothing ever inserts one) — the UI already
+  // treats a null target_date as "not set", so degrade instead of erroring.
+  return data ?? { target_date: null };
 }
