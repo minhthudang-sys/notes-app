@@ -82,15 +82,44 @@ before merging.
    check still runs on `/login` and every `/auth/*` page even though
    `suppressAuthSlot` hides its output — the check happens before the page
    decides to discard the result.
+6. `supabase/migrations/20260818075559_add_user_ownership_and_rls.sql:32` —
+   the backfill hardcodes `select id into strict owner_id from auth.users
+   where email = 'mtdangde@gmail.com'`. `strict into` raises an exception on
+   zero matching rows, so replaying the full migration history on a fresh
+   Supabase project — exactly what the README's own setup steps describe
+   (apply migrations, *then* create a test user) — aborts the migration
+   outright, since that email doesn't exist yet at that point. This is the
+   one finding that's literally the assignment's named "hardcoded email
+   address" mistake, even though it's a one-time data backfill rather than
+   auth logic.
+7. `supabase/migrations/...rls.sql:130` — `course` gets select/insert/update
+   policies but no delete policy, asymmetric with every other table in the
+   same migration (notes/collections/tags/sprints/parts all get full CRUD
+   policies).
+8. `app/workspace/notes/page.tsx` (and its tracker/dashboard/debug
+   siblings) — the `Suspense fallback={null}` + nested-async-wrapper +
+   `requireUser()` boilerplate is duplicated verbatim across four files,
+   while `app/workspace/page.tsx` uses a simpler direct-`await` form with no
+   Suspense wrapper. A shared helper would collapse this to one line per
+   page and remove the inconsistency — and this exact copy-paste pattern is
+   already what let `e36c9cd`'s bug happen once in this same PR's history
+   (a route missing the check because it wasn't applied uniformly).
 
-**Disposition:** recorded here, not auto-fixed before merge. None of these
-are the specific mistakes the assignment calls out (no browser-only auth
-check, no hardcoded email, no service-role key, no custom password
-handling) — the core auth gate is sound. #1 is the one worth fixing soon
-since it will visibly break the tracker for the second verification
-account; #2–#5 are real but lower-priority (stale display state, a
-defense-in-depth gap, and duplicated/wasted work) and are being picked up
-individually rather than blocking this merge.
+A second, independent `/code-review high` pass (run in parallel, delayed by
+a session-limit interruption) corroborated #1, #3, #4, and #5 above and
+surfaced #2, #6, #7, and #8 as additional findings.
+
+**Disposition:** recorded here, not auto-fixed before merge. Of the
+assignment's specific named mistakes (browser-only auth check, hardcoded
+email, service-role key, custom password handling), only #6 actually
+matches one — and even that is a migration backfill value, not auth logic,
+so the core sign-in/session-check/RLS design is sound. #1 and #6 are the
+two worth fixing soon: #1 will visibly break the tracker for the second
+verification account, and #6 will break `npx supabase db reset`/a fresh
+project setup outright. #2–#5, #7, and #8 are real but lower-priority
+(stale display state, a defense-in-depth gap, duplicated/wasted work, an
+asymmetric missing policy, and copy-pasted boilerplate) and are being
+picked up individually rather than blocking this merge.
 
 ## Rebuild — notes/collections/tags checklist gaps
 
