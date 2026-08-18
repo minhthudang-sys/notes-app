@@ -28,7 +28,7 @@ bolted on.
 - **Schema design and `supabase-js` client setup** — graded on its own; normalized
   schema, not one denormalized notes table.
 - **Notes**: create, edit, delete, list. Title + body content.
-- **Collections**: notes belong to one or more collections; filter by collection.
+- **Collections**: notes belong to at most one collection; filter by collection.
 - **Tag-based filtering**: notes can have multiple tags; filter by tag, and combine
   with a collection filter.
 - **Full-text search across notes**: title + body, real Postgres full-text search
@@ -78,9 +78,8 @@ sprints(id, name, module, platform_deadline, started, completed, review_days)
 parts(id, sprint_id fk, n, name, kind, status, reviewed, summary_url,
       submitted_on, passed_on, repo, review_score, reviewer, review_notes)
 todos(id, text, due, done, priority, created_at)
-notes(id, title, body, part_id fk nullable, search_vector tsvector, created_at, updated_at)
+notes(id, title, body, part_id fk nullable, collection_id fk nullable, search_vector tsvector, created_at, updated_at)
 collections(id, name, description)
-note_collections(note_id fk, collection_id fk)
 tags(id, name)
 note_tags(note_id fk, tag_id fk)
 stl_reviews(id, part_id fk, reviewer, score, rubric jsonb, notes, created_at)

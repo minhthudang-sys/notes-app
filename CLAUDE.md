@@ -69,6 +69,31 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
+## Auth: Signed-In Pages Must Verify Server-Side
+
+Every signed-in-only page must verify the user's session with the Supabase Auth server before it loads, and redirect to the sign-in page if the user is not signed in. Do not rely on the browser-side session alone.
+
+- Do the check server-side using the server client in `lib/supabase/server.ts` (e.g. `supabase.auth.getClaims()`), and `redirect("/auth/login")` on failure. `app/protected/page.tsx` shows the pattern to follow.
+- The root `proxy.ts` / `lib/supabase/proxy.ts` cookie-refresh check is not a substitute — it's a pathname-prefix allowlist (which currently excludes `/notes` and `/tracker` entirely) meant for session cookie housekeeping, not access control.
+- A `"use client"` page reading `lib/supabase/client.ts`'s browser session isn't sufficient either — that state can be stale or forged; the check must happen server-side before the page's content is sent down.
+
+## Supabase Conventions
+
+**Clients**
+
+- Browser client (`lib/supabase/client.ts`): `createBrowserClient`, uses `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. For Client Components and browser-side data helpers (`lib/supabase/notes.ts`, `lib/supabase/tracker.ts`).
+- Server client (`lib/supabase/server.ts`): `createServerClient`, cookies via `next/headers`. Create a fresh instance per call (Fluid compute — never cache at module scope). Use in Server Components, Route Handlers, Server Actions, and for the auth check above.
+- Session refresh (`lib/supabase/proxy.ts`'s `updateSession`, wired from the root `proxy.ts`): refreshes the auth cookie every request via this project's `proxy.ts` convention (not `middleware.ts`). Its redirect gate is partial/incomplete by design today — treat it as cookie housekeeping, not access control.
+
+**Tables** (source of truth: `supabase/migrations/*.sql`)
+
+- snake_case names; `uuid primary key default gen_random_uuid()`; `timestamptz ... default now()` for `created_at`/`updated_at` where present.
+- Foreign keys named `<table_singular>_id` with explicit `on delete cascade` / `on delete set null`.
+- Enum-like text columns use `check (col in (...))` rather than a Postgres enum type.
+- Join tables named `<table1>_<table2>` with a composite primary key.
+- Current tables: `notes`, `collections`, `tags`, `note_collections`, `note_tags`, `sprints`, `parts`, `course`.
+- RLS is currently disabled repo-wide and no table has a `user_id` column — intentional single-user/no-auth phase per `docs/product-vision.md`, schema deliberately left ready for a later `user_id` + RLS pass. Don't add either speculatively.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
