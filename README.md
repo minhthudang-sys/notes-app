@@ -42,9 +42,14 @@ Every route under `/workspace` requires a signed-in user (checked server-side, n
 
 ## Optional tasks
 
-- **Tags** (Medium): a `tags` column/table plus a tag filter in the notes UI, so a user can view only notes carrying a given tag (multi-select, AND-combined). Delivered on `feature/tag-colors`, merged via PR #1.
-- **Loading states** (Easy): skeleton placeholders for the notes/tracker/dashboard lists while they fetch from Supabase, instead of a blank-list flash. Delivered on `feature/loading-states`, merged via PR #5.
-- **GitHub social login** (Hard): a "Sign in with Github" option alongside email/password, using Supabase's GitHub OAuth provider. Delivered on `feature/loading-states`, merged via PR #5.
+- **Tags** (Medium): a `tags` column/table plus a tag filter in the notes UI, so a user can view only notes carrying a given tag (multi-select, AND-combined). Delivered on `feature/tag-colors`, merged via [PR #1](https://github.com/minhthudang-sys/notes-app/pull/1).
+- **Loading states** (Easy): skeleton placeholders for the notes/tracker/dashboard lists while they fetch from Supabase, instead of a blank-list flash. Delivered on `feature/loading-states`, merged via [PR #5](https://github.com/minhthudang-sys/notes-app/pull/5).
+- **GitHub social login** (Hard): a "Sign in with Github" option alongside email/password, using Supabase's GitHub OAuth provider. Delivered on `feature/loading-states`, merged via [PR #5](https://github.com/minhthudang-sys/notes-app/pull/5).
+
+## Merged pull requests
+
+- [PR #4 — Verify auth server-side on every /workspace page](https://github.com/minhthudang-sys/notes-app/pull/4): the Sprint 2 authentication/RLS branch, reviewed with two independent fresh-session `/code-review high` passes before merging (see `REFLECTION.md`).
+- [PR #5 — feat: skeleton loading states + Sign in with GitHub](https://github.com/minhthudang-sys/notes-app/pull/5): the optional-task branch above.
 
 ## Stack
 

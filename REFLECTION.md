@@ -48,7 +48,7 @@ any review recorded, on GitHub or otherwise.
 window has already closed now that `tags.color` is live); worth picking up
 individually rather than as a batch.
 
-## Review — PR #4 ("Verify auth server-side on every /workspace page")
+## Review — [PR #4](https://github.com/minhthudang-sys/notes-app/pull/4) ("Verify auth server-side on every /workspace page")
 
 **Tool:** `/code-review high`, run against `gh pr diff` for PR #4
 (`feature/add-auth` → `master`) — the Sprint 2 authentication/RLS branch,
