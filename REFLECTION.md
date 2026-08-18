@@ -216,3 +216,30 @@ a backstop. Code review on that PR then caught a bug in the hook itself — it
 was grepping whole diffs, including *removed* lines, so a commit that
 deleted a leaked occurrence still got blocked (`23af4f5` fixed it to check
 only added lines).
+
+## Local verification — note persistence and cross-account isolation
+
+![A second, incognito-window test account signed in as minh.test.admin.01@..., seeing exactly one note titled "Note created by test user" in the /workspace/notes index — none of the first account's notes.](docs/confirm%20note%20persistence%20and%20cross-account%20isolation.png)
+
+Ran the checklist end to end: created a note as the primary account
+(`mtdangde@gmail.com`), reloaded — still there. Signed out, confirmed
+`/workspace/*` redirects to `/login`. Created a second test account in the
+Supabase dashboard, signed in as it in a separate incognito window (so both
+sessions could be compared side by side), and created a note scoped to
+that account. The screenshot above is that second account's note index: it
+shows only the one note it created (title "Note created by test user"),
+not any of the first account's notes — confirming RLS is actually scoping
+reads per user, not just per note-ownership metadata that the UI happens
+to filter by.
+
+## Bonus — per-user scoping confirmed in the Supabase table editor
+
+![Supabase Table Editor on public.notes, showing rows with two distinct user_id values — most rows under one UUID (the primary account) and one row, "Note created by test user", under a different UUID (the second test account).](docs/bonus-points_notes%20dstinct%20user_ID.png)
+
+`public.notes` in the Supabase dashboard, filtered to no particular user
+(viewed as `postgres`, bypassing RLS, the way the dashboard's Table Editor
+does) — every row's `user_id` column matches the account that created it:
+the primary account's UUID on the older rows, and a different UUID on the
+row created by the second test account during the verification pass above.
+Same account, same `user_id`, every time; different accounts, different
+`user_id`s; nothing shared.

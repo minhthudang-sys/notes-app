@@ -38,7 +38,7 @@ Every route under `/workspace` requires a signed-in user (checked server-side, n
 
 ## Screenshot
 
-_TODO: add a screenshot of the running app (e.g. `docs/screenshot.png`) and reference it here — `![Study Archive](docs/screenshot.png)`._
+![Study Archive — note index](docs/notes-app.png)
 
 ## Optional task
 
