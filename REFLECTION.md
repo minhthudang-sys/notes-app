@@ -48,6 +48,50 @@ any review recorded, on GitHub or otherwise.
 window has already closed now that `tags.color` is live); worth picking up
 individually rather than as a batch.
 
+## Review — PR #4 ("Verify auth server-side on every /workspace page")
+
+**Tool:** `/code-review high`, run against `gh pr diff` for PR #4
+(`feature/add-auth` → `master`) — the Sprint 2 authentication/RLS branch,
+before merging.
+
+**Findings:**
+
+1. `supabase/migrations/20260818075559_add_user_ownership_and_rls.sql:126` —
+   `course` became a per-user table (`primary key (user_id)`) with no code
+   path that ever inserts a `course` row for a new user. `getCourse()`'s
+   `.single()` call is guaranteed to fail for every user except the one row
+   backfilled to the original account, so a second test account hitting
+   `/workspace/tracker/dashboard` or `/debug` sees an error, not the tracker.
+2. `components/archive-auth-status.tsx` — this Server Component lives in the
+   root layout, and neither `login-form.tsx`'s `router.push("/workspace")`
+   nor `archive-sign-out-button.tsx`'s `router.push("/login")` calls
+   `router.refresh()`. The header can keep showing "Sign in / Sign up" right
+   after a successful sign-in, or keep showing the previous user after
+   sign-out, until something else forces a layout re-render.
+3. `supabase/migrations/...rls.sql:83` — the `notes` insert/update policies
+   only check `user_id = auth.uid()`; unlike the `note_tags` policies a few
+   lines below (which explicitly check both the note's and the tag's
+   ownership), nothing verifies that `notes.collection_id` actually points
+   at a collection owned by the same user. A leaked/guessed collection UUID
+   from another account could be set as a note's `collection_id`.
+4. `lib/supabase/auth.ts:17` — `requireUser()` and `ArchiveAuthStatus` each
+   independently call `getClaims()`, so every `/workspace` page performs two
+   separate session-verification round trips per request instead of sharing
+   one result (Next's own auth guide recommends `cache()`-wrapping this).
+5. `components/archive-header.tsx:36` — `ArchiveAuthStatus`'s `getClaims()`
+   check still runs on `/login` and every `/auth/*` page even though
+   `suppressAuthSlot` hides its output — the check happens before the page
+   decides to discard the result.
+
+**Disposition:** recorded here, not auto-fixed before merge. None of these
+are the specific mistakes the assignment calls out (no browser-only auth
+check, no hardcoded email, no service-role key, no custom password
+handling) — the core auth gate is sound. #1 is the one worth fixing soon
+since it will visibly break the tracker for the second verification
+account; #2–#5 are real but lower-priority (stale display state, a
+defense-in-depth gap, and duplicated/wasted work) and are being picked up
+individually rather than blocking this merge.
+
 ## Rebuild — notes/collections/tags checklist gaps
 
 Same session, immediately after the review above: rebuilt the notes app's
