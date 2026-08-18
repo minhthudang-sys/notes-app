@@ -18,23 +18,35 @@ export const FOLDER_COLORS = [
 export type FolderColor = (typeof FOLDER_COLORS)[number];
 
 /**
- * Resolves a stable folder colour from a sprint record, so a newly
- * created sprint picks up a colour automatically. Deterministic:
- * the same id always yields the same colour, across reloads and
- * across devices, without storing the colour in the database.
+ * Resolves a stable folder colour from any entity with a stable id.
+ * Deterministic: the same id always yields the same colour, across
+ * reloads and across devices, without storing the colour in the
+ * database. Shared by folderColorForSprint/folderColorForCollection.
  */
-export function folderColorForSprint(sprint: { id: string }): FolderColor {
+function folderColorForId(entity: { id: string }): FolderColor {
   // FNV-1a, not a `hash*31 + c` roll: with a 5-entry palette, 31 ≡ 1
   // (mod 5), so every power of 31 collapses to 1 and the polynomial
   // hash degenerates into "sum of character codes" — order stops
   // mattering and same-length, same-alphabet ids (like our UUIDs)
   // pile into a couple of buckets instead of spreading across five.
   let hash = 0x811c9dc5;
-  for (let i = 0; i < sprint.id.length; i++) {
-    hash ^= sprint.id.charCodeAt(i);
+  for (let i = 0; i < entity.id.length; i++) {
+    hash ^= entity.id.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
   return FOLDER_COLORS[(hash >>> 0) % FOLDER_COLORS.length];
+}
+
+/** So a newly created sprint picks up a colour automatically. */
+export function folderColorForSprint(sprint: { id: string }): FolderColor {
+  return folderColorForId(sprint);
+}
+
+/** So a newly created collection picks up a colour automatically. */
+export function folderColorForCollection(collection: {
+  id: string;
+}): FolderColor {
+  return folderColorForId(collection);
 }
 
 /**

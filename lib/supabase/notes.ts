@@ -8,6 +8,7 @@ export type Note = {
   created_at: string;
   updated_at: string;
   part_id: string | null;
+  collection_id: string | null;
 };
 
 export type Collection = {
@@ -24,13 +25,14 @@ export type Tag = {
 };
 
 export type NoteWithRelations = Note & {
-  collections: Collection[];
+  collection: Collection | null;
   tags: Tag[];
 };
 
 export type NoteFilters = {
   collectionId?: string;
-  tagId?: string;
+  // AND logic: only notes carrying every one of these tags.
+  tagIds?: string[];
   search?: string;
   // Filter to a single part's summary note.
   partId?: string;
@@ -47,7 +49,8 @@ type RawNoteRow = {
   created_at: string;
   updated_at: string;
   part_id: string | null;
-  note_collections: { collection_id: string; collections: Collection }[];
+  collection_id: string | null;
+  collections: Collection | null;
   note_tags: { tag_id: string; tags: Tag }[];
 };
 
@@ -56,20 +59,44 @@ export async function getNotes(
 ): Promise<NoteWithRelations[]> {
   const supabase = createClient();
 
+  // AND-logic tag filter: an embedded-join filter on note_tags would only
+  // express "has at least one" and would also truncate each note's
+  // note_tags embed down to just the matched rows. Resolve matching note
+  // ids ourselves first, so the main query's tag embed always carries a
+  // note's full tag set (needed for display) and the AND check is exact.
+  let matchingNoteIds: string[] | undefined;
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    const { data: matches, error: tagError } = await supabase
+      .from("note_tags")
+      .select("note_id, tag_id")
+      .in("tag_id", filters.tagIds);
+    if (tagError) throw tagError;
+
+    const countByNote = new Map<string, number>();
+    for (const row of matches ?? []) {
+      countByNote.set(row.note_id, (countByNote.get(row.note_id) ?? 0) + 1);
+    }
+    matchingNoteIds = [...countByNote.entries()]
+      .filter(([, count]) => count === filters.tagIds!.length)
+      .map(([noteId]) => noteId);
+
+    if (matchingNoteIds.length === 0) return [];
+  }
+
   let query = supabase
     .from("notes")
     .select(
-      `id, title, body, created_at, updated_at, part_id,
-      note_collections${filters.collectionId ? "!inner" : ""}(collection_id, collections(*)),
-      note_tags${filters.tagId ? "!inner" : ""}(tag_id, tags(*))`,
+      `id, title, body, created_at, updated_at, part_id, collection_id,
+      collections(*),
+      note_tags(tag_id, tags(*))`,
     )
     .order("updated_at", { ascending: false });
 
   if (filters.collectionId) {
-    query = query.eq("note_collections.collection_id", filters.collectionId);
+    query = query.eq("collection_id", filters.collectionId);
   }
-  if (filters.tagId) {
-    query = query.eq("note_tags.tag_id", filters.tagId);
+  if (matchingNoteIds) {
+    query = query.in("id", matchingNoteIds);
   }
   if (filters.partId) {
     query = query.eq("part_id", filters.partId);
@@ -94,7 +121,8 @@ export async function getNotes(
     created_at: note.created_at,
     updated_at: note.updated_at,
     part_id: note.part_id,
-    collections: note.note_collections.map((nc) => nc.collections),
+    collection_id: note.collection_id,
+    collection: note.collections,
     tags: note.note_tags.map((nt) => nt.tags),
   }));
 }
@@ -104,7 +132,7 @@ export async function getNoteByPartId(partId: string): Promise<Note | null> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("notes")
-    .select("id, title, body, created_at, updated_at, part_id")
+    .select("id, title, body, created_at, updated_at, part_id, collection_id")
     .eq("part_id", partId)
     .maybeSingle();
 
@@ -244,27 +272,16 @@ export async function updateTagColor(
   return data;
 }
 
-export async function setNoteCollections(
+export async function setNoteCollection(
   noteId: string,
-  collectionIds: string[],
+  collectionId: string | null,
 ): Promise<void> {
   const supabase = createClient();
-
-  const { error: deleteError } = await supabase
-    .from("note_collections")
-    .delete()
-    .eq("note_id", noteId);
-  if (deleteError) throw deleteError;
-
-  if (collectionIds.length === 0) return;
-
-  const { error: insertError } = await supabase.from("note_collections").insert(
-    collectionIds.map((collectionId) => ({
-      note_id: noteId,
-      collection_id: collectionId,
-    })),
-  );
-  if (insertError) throw insertError;
+  const { error } = await supabase
+    .from("notes")
+    .update({ collection_id: collectionId })
+    .eq("id", noteId);
+  if (error) throw error;
 }
 
 export async function setNoteTags(
