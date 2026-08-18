@@ -40,9 +40,11 @@ Every route under `/workspace` requires a signed-in user (checked server-side, n
 
 ![Study Archive — note index](docs/notes-app.png)
 
-## Optional task
+## Optional tasks
 
-**Tags** (Medium): a `tags` column/table plus a tag filter in the notes UI, so a user can view only notes carrying a given tag (multi-select, AND-combined). Delivered on `feature/tag-colors`, merged via PR #1.
+- **Tags** (Medium): a `tags` column/table plus a tag filter in the notes UI, so a user can view only notes carrying a given tag (multi-select, AND-combined). Delivered on `feature/tag-colors`, merged via PR #1.
+- **Loading states** (Easy): skeleton placeholders for the notes/tracker/dashboard lists while they fetch from Supabase, instead of a blank-list flash. Delivered on `feature/loading-states`, merged via PR #5.
+- **GitHub social login** (Hard): a "Sign in with Github" option alongside email/password, using Supabase's GitHub OAuth provider. Delivered on `feature/loading-states`, merged via PR #5.
 
 ## Stack
 
