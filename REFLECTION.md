@@ -69,3 +69,58 @@ changed from submit-based to live/debounced. See
   the repo before this one.
 - `docs/` had no file that cited Supabase's actual documentation — see the
   new `docs/supabase-reference.md`.
+
+## Sprint 2 required prompts
+
+### The persistent-storage consultation
+
+I asked Claude Code directly: given the existing Next.js + Supabase stack from
+the database lesson, and with localStorage and sessionStorage ruled out
+outright, what should back note persistence for Sprint 2? It recommended
+keeping notes in the Supabase Postgres `notes` table already in place, rather
+than any client-side option, and scoping it with Postgres Row Level Security
+via a `user_id` column tied to `auth.uid()`.
+
+It surfaced a few trade-offs. IndexedDB/localStorage would need a hand-rolled
+per-device sync layer just to survive a reload in a different browser, and
+neither has any natural per-user security boundary — anyone with access to a
+shared machine could read every note, since there's no login gate at that
+layer. A separate backend/API in front of a different database would
+duplicate what the Supabase client already does, and would need its own auth
+wiring instead of reusing Supabase Auth's session. Staying on Supabase
+Postgres means persistence, auth, and per-row authorization are all handled
+by the same system, with RLS enforcing "your notes only" at the database
+layer instead of only in application code.
+
+I went with that recommendation: extend the existing `notes` table with
+`user_id uuid references auth.users(id) ... default auth.uid()`, enable RLS,
+and add matching `select`/`insert`/`update`/`delete` policies keyed to
+`auth.uid() = user_id`. That's the migration in
+`supabase/migrations/20260818075559_add_user_ownership_and_rls.sql`, applied
+to every user-data table, not just `notes`.
+
+### An auth issue caught in diff review and fixed
+
+Reviewing the diff before merging the auth branch, I found the signed-in
+check only ran on `/workspace` itself (`WorkspaceContent` calling
+`requireUser()`), while `/workspace/notes`, `/workspace/tracker`, and its
+`dashboard`/`debug` sub-routes rendered their client components with no
+server-side check of their own — reachable directly by URL even while
+signed out, since Next.js doesn't re-run a parent route's check on
+client-side navigation between siblings, and there was no shared
+layout-level gate either. I expected every `/workspace/*` route to redirect
+an unauthenticated visitor to `/login` before any content loaded, not just
+the top-level page.
+
+Fixed by adding `requireUser()` to the top of each of those pages
+individually (commit `e36c9cd`, "fix: verify every /workspace page
+server-side, not just /workspace itself"), following the same thin
+server-wrapper-around-a-client-component pattern already used for the notes
+page, and documented the rule explicitly in `CLAUDE.md` so it doesn't
+regress if a new `/workspace` route gets added later.
+
+### A prompt the agent misinterpreted
+
+_TODO: fill in from memory — a real example from this build, not one I can
+reconstruct from the repo alone. What did I ask, what did Claude Code build,
+and what did I change in the next prompt to redirect it?_

@@ -80,6 +80,7 @@ Every page under `/workspace` (notes, tracker, dashboard, and any future area) r
 - The root `proxy.ts` / `lib/supabase/proxy.ts` cookie-refresh check is not a substitute — it's a pathname-prefix allowlist (which currently excludes `/workspace` entirely, since the per-page checks above are the real gate) meant for session cookie housekeeping, not access control.
 - A `"use client"` page reading `lib/supabase/client.ts`'s browser session isn't sufficient either — that state can be stale or forged; the check must happen server-side before the page's content is sent down.
 - Redirect targets are fixed: sign-in success → `/workspace`; sign-out → `/login`. The sign-in page itself lives at `/login` (not under `/auth`); the other `/auth/*` routes (`sign-up`, `forgot-password`, `update-password`, `callback`, `confirm`, `error`) are unaffected.
+- No service-role key anywhere client-accessible: never put a Supabase service-role key in a `NEXT_PUBLIC_*` env var, in client-component code, or anywhere it would ship to the browser. This app doesn't use one at all — RLS handles authorization, so a service-role key (which bypasses RLS) has no legitimate use here.
 
 ## Supabase Conventions
 
@@ -96,7 +97,7 @@ Every page under `/workspace` (notes, tracker, dashboard, and any future area) r
 - Enum-like text columns use `check (col in (...))` rather than a Postgres enum type.
 - Join tables named `<table1>_<table2>` with a composite primary key.
 - Current tables: `notes`, `collections`, `tags`, `note_collections`, `note_tags`, `sprints`, `parts`, `course`.
-- RLS is currently disabled repo-wide and no table has a `user_id` column — intentional single-user/no-auth phase per `docs/product-vision.md`, schema deliberately left ready for a later `user_id` + RLS pass. Don't add either speculatively.
+- RLS is enabled on every table, each scoped by a `user_id uuid references auth.users(id) on delete cascade default auth.uid()` column (see `supabase/migrations/20260818075559_add_user_ownership_and_rls.sql`). Policies follow `to authenticated using ((select auth.uid()) = user_id)` (plus matching `with check` on insert/update); `note_tags` has no `user_id` of its own and checks ownership through the `notes`/`tags` rows it links instead. `course`'s primary key is `user_id` itself (one row per user) rather than the old boolean singleton. New tables holding user data must follow this same pattern — RLS is not optional or deferred anymore.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
