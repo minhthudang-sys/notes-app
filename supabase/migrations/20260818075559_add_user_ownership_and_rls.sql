@@ -22,21 +22,24 @@ alter table parts       add column user_id uuid references auth.users(id) on del
 alter table course      add column user_id uuid references auth.users(id) on delete cascade default auth.uid();
 
 -- 2. Backfill existing rows (all created before any account existed) to the
---    sole current account. `select into strict` raises if that account
---    isn't found or isn't unique, so this fails loudly instead of silently
---    mis-assigning data to the wrong (or a nonexistent) user.
+--    sole current account, if that account exists yet. It won't on a fresh
+--    project being migrated before any user is created (see README) — in
+--    that case there's nothing to backfill anyway, so skip rather than
+--    aborting the whole migration.
 do $$
 declare
   owner_id uuid;
 begin
-  select id into strict owner_id from auth.users where email = 'mtdangde@gmail.com';
+  select id into owner_id from auth.users where email = 'mtdangde@gmail.com' limit 1;
 
-  update notes       set user_id = owner_id where user_id is null;
-  update collections set user_id = owner_id where user_id is null;
-  update tags        set user_id = owner_id where user_id is null;
-  update sprints     set user_id = owner_id where user_id is null;
-  update parts       set user_id = owner_id where user_id is null;
-  update course      set user_id = owner_id where user_id is null;
+  if owner_id is not null then
+    update notes       set user_id = owner_id where user_id is null;
+    update collections set user_id = owner_id where user_id is null;
+    update tags        set user_id = owner_id where user_id is null;
+    update sprints     set user_id = owner_id where user_id is null;
+    update parts       set user_id = owner_id where user_id is null;
+    update course      set user_id = owner_id where user_id is null;
+  end if;
 end $$;
 
 -- 3. Now that every row has an owner, require it going forward.
