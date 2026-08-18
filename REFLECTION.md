@@ -232,6 +232,36 @@ not any of the first account's notes — confirming RLS is actually scoping
 reads per user, not just per note-ownership metadata that the UI happens
 to filter by.
 
+## Optional — skeleton loading states
+
+`components/archive/skeleton.tsx` adds a `Skeleton` primitive (Tailwind's
+`animate-pulse`, following the existing `surface="dark"|"paper"` convention
+used by `MetadataLabel`/`TagBadge`), and `app/workspace/notes/notes-client.tsx`,
+`app/workspace/tracker/tracker-client.tsx`, and
+`app/workspace/tracker/dashboard/dashboard-client.tsx` now render
+content-shaped skeleton blocks in place of the previous plain "Loading..."
+text while their Supabase fetch is in flight. This avoids a blank-list flash
+on mount and makes each page's loading state look like the layout it's about
+to fill in. See commit `7d38b87`.
+
+## Optional — Sign in with GitHub
+
+Added a "Sign in with Github" button to the login page
+(`components/login-form.tsx`), alongside the existing "Sign in with Google"
+button, both calling `supabase.auth.signInWithOAuth()` with their respective
+provider and sharing the same `/auth/callback` route (already
+provider-agnostic — it exchanges the OAuth code for a session and redirects
+to `next`, which both buttons set to `/workspace`, the same place
+email/password sign-in lands). GitHub's provider and OAuth credentials were
+already enabled in the Supabase dashboard.
+
+Verified end to end: signed in with GitHub as the primary account
+(`mtdangde@gmail.com`), which already had a Google-linked session — Supabase
+merged the new GitHub identity into the same user record rather than
+creating a second one. The Supabase dashboard's Users table confirms this:
+
+![Supabase Users table: one row for mtdangde@gmail.com showing "GitHub, Google" under Providers, and a second row for a different test account showing only "Google".](docs/Github%20user%20login_supabase%20table.png)
+
 ## Bonus — per-user scoping confirmed in the Supabase table editor
 
 ![Supabase Table Editor on public.notes, showing rows with two distinct user_id values — most rows under one UUID (the primary account) and one row, "Note created by test user", under a different UUID (the second test account).](docs/bonus-points_notes%20dstinct%20user_ID.png)

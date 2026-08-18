@@ -12,6 +12,7 @@ import {
   FolderTab,
   MetadataLabel,
   PaperPanel,
+  Skeleton,
   TagBadge,
   TagColorPicker,
 } from "@/components/archive";
@@ -691,9 +692,28 @@ function NotesPageContent() {
             </div>
 
             {loading ? (
-              <p className="font-mono text-xs text-archive-dim">
-                Reading index…
-              </p>
+              <ul
+                role="status"
+                aria-label="Loading notes"
+                className="grid gap-4 md:grid-cols-2"
+              >
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <PaperPanel
+                    as="li"
+                    key={i}
+                    tooth
+                    className="flex flex-col gap-3 p-4"
+                  >
+                    <Skeleton surface="paper" className="h-5 w-2/3" />
+                    <Skeleton surface="paper" className="h-3 w-full" />
+                    <Skeleton surface="paper" className="h-3 w-5/6" />
+                    <div className="mt-auto flex items-center justify-between border-t border-paper-edge pt-3">
+                      <Skeleton surface="paper" className="h-3 w-16" />
+                      <Skeleton surface="paper" className="h-7 w-20" />
+                    </div>
+                  </PaperPanel>
+                ))}
+              </ul>
             ) : notes.length === 0 ? (
               <p className="font-mono text-xs text-archive-dim">
                 No papers match this filter.
