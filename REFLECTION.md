@@ -262,14 +262,14 @@ creating a second one. The Supabase dashboard's Users table confirms this:
 
 ![Supabase Users table: one row for mtdangde@gmail.com showing "GitHub, Google" under Providers, and a second row for a different test account showing only "Google".](docs/Github%20user%20login_supabase%20table.png)
 
-## Bonus — per-user scoping confirmed in the Supabase table editor
+## Bonus — per-user scoping confirmed via a Supabase SQL editor query
 
-![Supabase Table Editor on public.notes, showing rows with two distinct user_id values — most rows under one UUID (the primary account) and one row, "Note created by test user", under a different UUID (the second test account).](docs/bonus-points_notes%20dstinct%20user_ID.png)
+![Supabase SQL Editor running `select id, user_id, title from notes order by user_id;` against public.notes, returning 7 rows with two distinct user_id values — six rows under one UUID (the primary account) and one row, "Note created by test user", under a different UUID (the second test account).](docs/bonus-points_notes%20distinct%20user_id%20SQL%20editor.png)
 
-`public.notes` in the Supabase dashboard, filtered to no particular user
-(viewed as `postgres`, bypassing RLS, the way the dashboard's Table Editor
+Ran `select id, user_id, title from notes order by user_id;` in the Supabase
+dashboard's SQL Editor (as `postgres`, bypassing RLS, the way the SQL Editor
 does) — every row's `user_id` column matches the account that created it:
-the primary account's UUID on the older rows, and a different UUID on the
-row created by the second test account during the verification pass above.
+the primary account's UUID on six rows, and a different UUID on the row
+created by the second test account during the verification pass above.
 Same account, same `user_id`, every time; different accounts, different
 `user_id`s; nothing shared.
