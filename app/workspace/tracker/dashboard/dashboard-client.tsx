@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   MetadataLabel,
   PaperPanel,
+  Skeleton,
   StatusStamp,
   TEACH_BACK_STATUSES,
   type StatusSet,
@@ -117,10 +118,40 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <p className="font-mono text-xs text-archive-dim">
-          Loading dashboard…
-        </p>
+      <main
+        className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10"
+        role="status"
+        aria-label="Loading dashboard"
+      >
+        <header className="mb-8">
+          <p className="font-mono text-[11px] uppercase tracking-label text-archive-dim">
+            Study archive
+          </p>
+          <h1 className="mt-2 font-display text-3xl uppercase tracking-tight text-archive-bright sm:text-5xl">
+            Dashboard
+          </h1>
+        </header>
+
+        <PaperPanel edge="top" tooth className="mb-6 p-5 sm:p-6">
+          <Skeleton surface="paper" className="h-3 w-24" />
+          <Skeleton surface="paper" className="mt-2 h-10 w-32" />
+          <Skeleton surface="paper" className="mt-3 h-4 w-full max-w-md" />
+        </PaperPanel>
+
+        <PaperPanel tooth className="p-5">
+          <Skeleton surface="paper" className="h-5 w-40" />
+          <Skeleton surface="paper" className="mt-3 h-4 w-full" />
+        </PaperPanel>
+
+        <PaperPanel tooth className="mt-6 p-5">
+          <Skeleton surface="paper" className="h-5 w-48" />
+          <Skeleton surface="paper" className="mt-3 h-4 w-full" />
+        </PaperPanel>
+
+        <PaperPanel tooth className="mt-6 p-5">
+          <Skeleton surface="paper" className="h-5 w-32" />
+          <Skeleton surface="paper" className="mt-3 h-4 w-full" />
+        </PaperPanel>
       </main>
     );
   }

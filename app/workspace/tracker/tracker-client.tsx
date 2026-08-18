@@ -12,6 +12,7 @@ import {
   FolderTab,
   MetadataLabel,
   PaperPanel,
+  Skeleton,
   StatusStamp,
   PART_STATUSES,
   TEACH_BACK_STATUSES,
@@ -298,7 +299,15 @@ export default function TrackerPage() {
       )}
 
       {loading ? (
-        <p className="font-mono text-xs text-archive-dim">Opening archive…</p>
+        <div
+          role="status"
+          aria-label="Loading sprints"
+          className="flex flex-col gap-2"
+        >
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full" />
+          ))}
+        </div>
       ) : sprints.length === 0 ? (
         <p className="font-mono text-xs text-archive-dim">
           No sprints filed yet.
