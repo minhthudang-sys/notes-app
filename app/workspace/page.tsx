@@ -1,26 +1,15 @@
-import { redirect } from "next/navigation";
-
 import { DeployButton } from "@/components/deploy-button";
 import { EnvVarWarning } from "@/components/env-var-warning";
 import { AuthButton } from "@/components/auth-button";
 import { hasEnvVars } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/auth";
 import Link from "next/link";
 import { InfoIcon } from "lucide-react";
 import { Suspense } from "react";
 
-async function UserDetails() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
+export default async function WorkspacePage() {
+  const claims = await requireUser();
 
-  if (error || !data?.claims) {
-    redirect("/login");
-  }
-
-  return JSON.stringify(data.claims, null, 2);
-}
-
-export default function WorkspacePage() {
   return (
     <main className="min-h-screen flex flex-col items-center">
       <div className="flex-1 w-full flex flex-col gap-20 items-center">
@@ -53,9 +42,7 @@ export default function WorkspacePage() {
             <div className="flex flex-col gap-2 items-start">
               <h2 className="font-bold text-2xl mb-4">Your user details</h2>
               <pre className="text-xs font-mono p-3 rounded border max-h-32 overflow-auto">
-                <Suspense>
-                  <UserDetails />
-                </Suspense>
+                {JSON.stringify(claims, null, 2)}
               </pre>
             </div>
           </div>

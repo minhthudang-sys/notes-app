@@ -16,8 +16,9 @@ each entry backs a real decision already in the code.
   `proxy.ts`.
 
 - **[`auth.getClaims()` reference](https://supabase.com/docs/reference/javascript/auth-getclaims)**
-  — server-side session verification, used in `app/workspace/page.tsx`
-  and required by the "Auth: Signed-In Pages Must Verify Server-Side"
+  — server-side session verification, wrapped by `requireUser()` in
+  `lib/supabase/auth.ts` and called from every page under `/workspace`,
+  as required by the "Auth: Signed-In Pages Must Verify Server-Side"
   rule in `CLAUDE.md`.
 
 - **[OAuth server-side auth guide](https://supabase.com/docs/guides/auth/social-login/auth-google#with-nextjs-ssr)**
