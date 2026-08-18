@@ -109,17 +109,17 @@ A second, independent `/code-review high` pass (run in parallel, delayed by
 a session-limit interruption) corroborated #1, #3, #4, and #5 above and
 surfaced #2, #6, #7, and #8 as additional findings.
 
-**Disposition:** recorded here, not auto-fixed before merge. Of the
-assignment's specific named mistakes (browser-only auth check, hardcoded
-email, service-role key, custom password handling), only #6 actually
-matches one — and even that is a migration backfill value, not auth logic,
-so the core sign-in/session-check/RLS design is sound. #1 and #6 are the
-two worth fixing soon: #1 will visibly break the tracker for the second
-verification account, and #6 will break `npx supabase db reset`/a fresh
-project setup outright. #2–#5, #7, and #8 are real but lower-priority
-(stale display state, a defense-in-depth gap, duplicated/wasted work, an
-asymmetric missing policy, and copy-pasted boilerplate) and are being
-picked up individually rather than blocking this merge.
+**Disposition:** #1 and #6 fixed before merge (`3f29edb`, `8397f52`) —
+#1 would have visibly broken the tracker for the second verification
+account, and #6 (the assignment's named "hardcoded email address" mistake,
+here in a migration backfill rather than auth logic) would have broken
+`npx supabase db reset`/a fresh project setup outright. Of the assignment's
+other specific named mistakes (browser-only auth check, service-role key,
+custom password handling), none apply — the core sign-in/session-check/RLS
+design is sound. #2–#5, #7, and #8 are real but lower-priority (stale
+display state, a defense-in-depth gap, duplicated/wasted work, an
+asymmetric missing policy, and copy-pasted boilerplate) and are recorded
+here rather than fixed, to be picked up individually later.
 
 ## Rebuild — notes/collections/tags checklist gaps
 
