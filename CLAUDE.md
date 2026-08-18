@@ -24,7 +24,7 @@ Behavioral guidelines for this repo — bias toward caution over speed, use judg
 
 **`supabase/migrations/`** (chronological): create_notes → collections_tags_search → study_tracker (sprints/parts/todos) → part_kind_and_course → drop_todos → tag_colors → notes_single_collection (dropped the `note_collections` join table for a nullable `notes.collection_id`) → add_user_ownership_and_rls. Current tables: `notes`, `collections`, `tags`, `note_tags`, `sprints`, `parts`, `course`. `seed.sql` is real data applied to the live DB.
 
-**Docs (read instead of re-deriving):** `docs/product-vision.md` (why this app exists) · `docs/supabase-reference.md` (Supabase/Postgres doc → decision mapping) · `docs/data-sources.md` (repo is self-contained) · `docs/agent-prompts.md` (1000+ line build history — archaeology only) · `components/archive/README.md` (design-system rules).
+**Docs (read instead of re-deriving):** `docs/product-vision.md` (why this app exists) · `docs/supabase-reference.md` (Supabase/Postgres doc → decision mapping) · `docs/data-sources.md` (repo is self-contained) · `docs/agent-prompts.md` (1000+ line build history — archaeology only) · `components/archive/README.md` (design-system rules). Read these only when the task actually touches that area, not proactively.
 
 ## Coding Guidelines
 
