@@ -121,6 +121,25 @@ regress if a new `/workspace` route gets added later.
 
 ### A prompt the agent misinterpreted
 
-_TODO: fill in from memory — a real example from this build, not one I can
-reconstruct from the repo alone. What did I ask, what did Claude Code build,
-and what did I change in the next prompt to redirect it?_
+When drafting new sections of `docs/agent-prompts.md`, I asked Claude Code to
+pull realistic seed content from an unrelated external project's
+`course-data.json` rather than inventing placeholder data. It interpreted
+that as "copy the file's content," which included a real (if
+already-rotated) database password sitting in that JSON — it pasted the
+literal string into the todos table, I caught it and redacted it (`c961454`),
+and then it came back on a *later*, unrelated prompt (`ef7d46e`), because I
+kept pointing it at the same external file to draft from and it kept copying
+from wherever the password still lived there. It happened a third time on
+another branch before I noticed the pattern: I was fixing the symptom every
+time instead of the cause.
+
+My next prompt changed the ask entirely — not "redact this occurrence" but
+"find why this keeps happening and make it structurally impossible." That
+produced `38352a7`: a `docs/data-sources.md` declaring the repo
+self-contained (all real seed data already lives in `supabase/seed.sql`, so
+there's no reason to ever draft from the external file again) and a
+pre-commit hook that blocks the leaked string from being committed at all, as
+a backstop. Code review on that PR then caught a bug in the hook itself — it
+was grepping whole diffs, including *removed* lines, so a commit that
+deleted a leaked occurrence still got blocked (`23af4f5` fixed it to check
+only added lines).
