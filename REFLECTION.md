@@ -48,6 +48,79 @@ any review recorded, on GitHub or otherwise.
 window has already closed now that `tags.color` is live); worth picking up
 individually rather than as a batch.
 
+## Review — PR #4 ("Verify auth server-side on every /workspace page")
+
+**Tool:** `/code-review high`, run against `gh pr diff` for PR #4
+(`feature/add-auth` → `master`) — the Sprint 2 authentication/RLS branch,
+before merging.
+
+**Findings:**
+
+1. `supabase/migrations/20260818075559_add_user_ownership_and_rls.sql:126` —
+   `course` became a per-user table (`primary key (user_id)`) with no code
+   path that ever inserts a `course` row for a new user. `getCourse()`'s
+   `.single()` call is guaranteed to fail for every user except the one row
+   backfilled to the original account, so a second test account hitting
+   `/workspace/tracker/dashboard` or `/debug` sees an error, not the tracker.
+2. `components/archive-auth-status.tsx` — this Server Component lives in the
+   root layout, and neither `login-form.tsx`'s `router.push("/workspace")`
+   nor `archive-sign-out-button.tsx`'s `router.push("/login")` calls
+   `router.refresh()`. The header can keep showing "Sign in / Sign up" right
+   after a successful sign-in, or keep showing the previous user after
+   sign-out, until something else forces a layout re-render.
+3. `supabase/migrations/...rls.sql:83` — the `notes` insert/update policies
+   only check `user_id = auth.uid()`; unlike the `note_tags` policies a few
+   lines below (which explicitly check both the note's and the tag's
+   ownership), nothing verifies that `notes.collection_id` actually points
+   at a collection owned by the same user. A leaked/guessed collection UUID
+   from another account could be set as a note's `collection_id`.
+4. `lib/supabase/auth.ts:17` — `requireUser()` and `ArchiveAuthStatus` each
+   independently call `getClaims()`, so every `/workspace` page performs two
+   separate session-verification round trips per request instead of sharing
+   one result (Next's own auth guide recommends `cache()`-wrapping this).
+5. `components/archive-header.tsx:36` — `ArchiveAuthStatus`'s `getClaims()`
+   check still runs on `/login` and every `/auth/*` page even though
+   `suppressAuthSlot` hides its output — the check happens before the page
+   decides to discard the result.
+6. `supabase/migrations/20260818075559_add_user_ownership_and_rls.sql:32` —
+   the backfill hardcodes `select id into strict owner_id from auth.users
+   where email = 'mtdangde@gmail.com'`. `strict into` raises an exception on
+   zero matching rows, so replaying the full migration history on a fresh
+   Supabase project — exactly what the README's own setup steps describe
+   (apply migrations, *then* create a test user) — aborts the migration
+   outright, since that email doesn't exist yet at that point. This is the
+   one finding that's literally the assignment's named "hardcoded email
+   address" mistake, even though it's a one-time data backfill rather than
+   auth logic.
+7. `supabase/migrations/...rls.sql:130` — `course` gets select/insert/update
+   policies but no delete policy, asymmetric with every other table in the
+   same migration (notes/collections/tags/sprints/parts all get full CRUD
+   policies).
+8. `app/workspace/notes/page.tsx` (and its tracker/dashboard/debug
+   siblings) — the `Suspense fallback={null}` + nested-async-wrapper +
+   `requireUser()` boilerplate is duplicated verbatim across four files,
+   while `app/workspace/page.tsx` uses a simpler direct-`await` form with no
+   Suspense wrapper. A shared helper would collapse this to one line per
+   page and remove the inconsistency — and this exact copy-paste pattern is
+   already what let `e36c9cd`'s bug happen once in this same PR's history
+   (a route missing the check because it wasn't applied uniformly).
+
+A second, independent `/code-review high` pass (run in parallel, delayed by
+a session-limit interruption) corroborated #1, #3, #4, and #5 above and
+surfaced #2, #6, #7, and #8 as additional findings.
+
+**Disposition:** #1 and #6 fixed before merge (`3f29edb`, `8397f52`) —
+#1 would have visibly broken the tracker for the second verification
+account, and #6 (the assignment's named "hardcoded email address" mistake,
+here in a migration backfill rather than auth logic) would have broken
+`npx supabase db reset`/a fresh project setup outright. Of the assignment's
+other specific named mistakes (browser-only auth check, service-role key,
+custom password handling), none apply — the core sign-in/session-check/RLS
+design is sound. #2–#5, #7, and #8 are real but lower-priority (stale
+display state, a defense-in-depth gap, duplicated/wasted work, an
+asymmetric missing policy, and copy-pasted boilerplate) and are recorded
+here rather than fixed, to be picked up individually later.
+
 ## Rebuild — notes/collections/tags checklist gaps
 
 Same session, immediately after the review above: rebuilt the notes app's
@@ -69,3 +142,104 @@ changed from submit-based to live/debounced. See
   the repo before this one.
 - `docs/` had no file that cited Supabase's actual documentation — see the
   new `docs/supabase-reference.md`.
+
+## Sprint 2 required prompts
+
+### The persistent-storage consultation
+
+I asked Claude Code directly: given the existing Next.js + Supabase stack from
+the database lesson, and with localStorage and sessionStorage ruled out
+outright, what should back note persistence for Sprint 2? It recommended
+keeping notes in the Supabase Postgres `notes` table already in place, rather
+than any client-side option, and scoping it with Postgres Row Level Security
+via a `user_id` column tied to `auth.uid()`.
+
+It surfaced a few trade-offs. IndexedDB/localStorage would need a hand-rolled
+per-device sync layer just to survive a reload in a different browser, and
+neither has any natural per-user security boundary — anyone with access to a
+shared machine could read every note, since there's no login gate at that
+layer. A separate backend/API in front of a different database would
+duplicate what the Supabase client already does, and would need its own auth
+wiring instead of reusing Supabase Auth's session. Staying on Supabase
+Postgres means persistence, auth, and per-row authorization are all handled
+by the same system, with RLS enforcing "your notes only" at the database
+layer instead of only in application code.
+
+I went with that recommendation: extend the existing `notes` table with
+`user_id uuid references auth.users(id) ... default auth.uid()`, enable RLS,
+and add matching `select`/`insert`/`update`/`delete` policies keyed to
+`auth.uid() = user_id`. That's the migration in
+`supabase/migrations/20260818075559_add_user_ownership_and_rls.sql`, applied
+to every user-data table, not just `notes`.
+
+### An auth issue caught in diff review and fixed
+
+Reviewing the diff before merging the auth branch, I found the signed-in
+check only ran on `/workspace` itself (`WorkspaceContent` calling
+`requireUser()`), while `/workspace/notes`, `/workspace/tracker`, and its
+`dashboard`/`debug` sub-routes rendered their client components with no
+server-side check of their own — reachable directly by URL even while
+signed out, since Next.js doesn't re-run a parent route's check on
+client-side navigation between siblings, and there was no shared
+layout-level gate either. I expected every `/workspace/*` route to redirect
+an unauthenticated visitor to `/login` before any content loaded, not just
+the top-level page.
+
+Fixed by adding `requireUser()` to the top of each of those pages
+individually (commit `e36c9cd`, "fix: verify every /workspace page
+server-side, not just /workspace itself"), following the same thin
+server-wrapper-around-a-client-component pattern already used for the notes
+page, and documented the rule explicitly in `CLAUDE.md` so it doesn't
+regress if a new `/workspace` route gets added later.
+
+### A prompt the agent misinterpreted
+
+When drafting new sections of `docs/agent-prompts.md`, I asked Claude Code to
+pull realistic seed content from an unrelated external project's
+`course-data.json` rather than inventing placeholder data. It interpreted
+that as "copy the file's content," which included a real (if
+already-rotated) database password sitting in that JSON — it pasted the
+literal string into the todos table, I caught it and redacted it (`c961454`),
+and then it came back on a *later*, unrelated prompt (`ef7d46e`), because I
+kept pointing it at the same external file to draft from and it kept copying
+from wherever the password still lived there. It happened a third time on
+another branch before I noticed the pattern: I was fixing the symptom every
+time instead of the cause.
+
+My next prompt changed the ask entirely — not "redact this occurrence" but
+"find why this keeps happening and make it structurally impossible." That
+produced `38352a7`: a `docs/data-sources.md` declaring the repo
+self-contained (all real seed data already lives in `supabase/seed.sql`, so
+there's no reason to ever draft from the external file again) and a
+pre-commit hook that blocks the leaked string from being committed at all, as
+a backstop. Code review on that PR then caught a bug in the hook itself — it
+was grepping whole diffs, including *removed* lines, so a commit that
+deleted a leaked occurrence still got blocked (`23af4f5` fixed it to check
+only added lines).
+
+## Local verification — note persistence and cross-account isolation
+
+![A second, incognito-window test account signed in as minh.test.admin.01@..., seeing exactly one note titled "Note created by test user" in the /workspace/notes index — none of the first account's notes.](docs/confirm%20note%20persistence%20and%20cross-account%20isolation.png)
+
+Ran the checklist end to end: created a note as the primary account
+(`mtdangde@gmail.com`), reloaded — still there. Signed out, confirmed
+`/workspace/*` redirects to `/login`. Created a second test account in the
+Supabase dashboard, signed in as it in a separate incognito window (so both
+sessions could be compared side by side), and created a note scoped to
+that account. The screenshot above is that second account's note index: it
+shows only the one note it created (title "Note created by test user"),
+not any of the first account's notes — confirming RLS is actually scoping
+reads per user, not just per note-ownership metadata that the UI happens
+to filter by.
+
+## Bonus — per-user scoping confirmed in the Supabase table editor
+
+![Supabase Table Editor on public.notes, showing rows with two distinct user_id values — most rows under one UUID (the primary account) and one row, "Note created by test user", under a different UUID (the second test account).](docs/bonus-points_notes%20dstinct%20user_ID.png)
+
+`public.notes` in the Supabase dashboard, filtered to no particular user
+(viewed as `postgres`, bypassing RLS, the way the dashboard's Table Editor
+does) — every row's `user_id` column matches the account that created it:
+the primary account's UUID on the older rows, and a different UUID on the
+row created by the second test account during the verification pass above.
+Same account, same `user_id`, every time; different accounts, different
+`user_id`s; nothing shared.

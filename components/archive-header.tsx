@@ -6,9 +6,13 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const AREAS = [
-  { href: "/tracker", label: "Archive", hint: "Sprints & chapters" },
-  { href: "/tracker/dashboard", label: "Dashboard", hint: "Progress & timeline" },
-  { href: "/notes", label: "Index", hint: "All notes" },
+  { href: "/workspace/tracker", label: "Archive", hint: "Sprints & chapters" },
+  {
+    href: "/workspace/tracker/dashboard",
+    label: "Dashboard",
+    hint: "Progress & timeline",
+  },
+  { href: "/workspace/notes", label: "Index", hint: "All notes" },
 ];
 
 /**
@@ -16,7 +20,7 @@ const AREAS = [
  * archive, the dashboard and the notes index — legible as one
  * application.
  */
-export function ArchiveHeader() {
+export function ArchiveHeader({ authSlot }: { authSlot: React.ReactNode }) {
   const pathname = usePathname();
 
   // Longest-prefix match, so nested routes (e.g. /tracker/dashboard)
@@ -25,6 +29,11 @@ export function ArchiveHeader() {
     .sort((a, b) => b.href.length - a.href.length)
     .find((area) => pathname === area.href || pathname.startsWith(area.href + "/"))
     ?.href;
+
+  // The account controls are redundant on the pages that ARE the sign-in/
+  // sign-up flow — those already have their own cross-links (e.g.
+  // sign-up-form.tsx links to /login).
+  const suppressAuthSlot = pathname === "/login" || pathname.startsWith("/auth/");
 
   return (
     <header className="border-b border-archive-rule bg-archive-deep">
@@ -57,6 +66,10 @@ export function ArchiveHeader() {
             );
           })}
         </nav>
+
+        {!suppressAuthSlot && (
+          <div className="ml-auto flex items-center">{authSlot}</div>
+        )}
       </div>
     </header>
   );

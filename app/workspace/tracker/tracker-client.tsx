@@ -677,7 +677,7 @@ function CaseFile({
 
           {hasNote && (
             <Link
-              href={`/notes?partId=${part.id}`}
+              href={`/workspace/notes?partId=${part.id}`}
               className="no-paper-link font-mono text-[11px] uppercase tracking-label text-ink underline underline-offset-4"
             >
               Edit in index →

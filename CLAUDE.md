@@ -71,11 +71,16 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Auth: Signed-In Pages Must Verify Server-Side
 
-Every signed-in-only page must verify the user's session with the Supabase Auth server before it loads, and redirect to the sign-in page if the user is not signed in. Do not rely on the browser-side session alone.
+Use Supabase Auth for all sign-in and session handling — never build custom auth or store passwords ourselves.
 
-- Do the check server-side using the server client in `lib/supabase/server.ts` (e.g. `supabase.auth.getClaims()`), and `redirect("/auth/login")` on failure. `app/protected/page.tsx` shows the pattern to follow.
-- The root `proxy.ts` / `lib/supabase/proxy.ts` cookie-refresh check is not a substitute — it's a pathname-prefix allowlist (which currently excludes `/notes` and `/tracker` entirely) meant for session cookie housekeeping, not access control.
+Every page under `/workspace` (notes, tracker, dashboard, and any future area) requires a signed-in user, verified server-side, before it loads. Do not rely on the browser-side session alone.
+
+- Call `requireUser()` (`lib/supabase/auth.ts`) at the top of every page under `/workspace` — it wraps the server client in `lib/supabase/server.ts` (`supabase.auth.getClaims()`) and `redirect("/login")`s on failure. This is deliberately a per-page call, not a single check in `app/workspace/layout.tsx`: per `node_modules/next/dist/docs/01-app/02-guides/authentication.md` ("Layouts and auth checks"), a layout doesn't re-run on client-side navigation between sibling routes and doesn't block the rest of the route from rendering, so a layout-only gate isn't reliable — don't reintroduce one.
+- Every page under `/workspace` is a `"use client"` component today, which can't call `requireUser()` directly. The pattern: a plain `.tsx` file (e.g. `notes-client.tsx`) holds the existing client component, and `page.tsx` is a thin async Server Component that calls `requireUser()` then renders it — see `app/workspace/notes/page.tsx`.
+- The root `proxy.ts` / `lib/supabase/proxy.ts` cookie-refresh check is not a substitute — it's a pathname-prefix allowlist (which currently excludes `/workspace` entirely, since the per-page checks above are the real gate) meant for session cookie housekeeping, not access control.
 - A `"use client"` page reading `lib/supabase/client.ts`'s browser session isn't sufficient either — that state can be stale or forged; the check must happen server-side before the page's content is sent down.
+- Redirect targets are fixed: sign-in success → `/workspace`; sign-out → `/login`. The sign-in page itself lives at `/login` (not under `/auth`); the other `/auth/*` routes (`sign-up`, `forgot-password`, `update-password`, `callback`, `confirm`, `error`) are unaffected.
+- No service-role key anywhere client-accessible: never put a Supabase service-role key in a `NEXT_PUBLIC_*` env var, in client-component code, or anywhere it would ship to the browser. This app doesn't use one at all — RLS handles authorization, so a service-role key (which bypasses RLS) has no legitimate use here.
 
 ## Supabase Conventions
 
@@ -92,7 +97,7 @@ Every signed-in-only page must verify the user's session with the Supabase Auth 
 - Enum-like text columns use `check (col in (...))` rather than a Postgres enum type.
 - Join tables named `<table1>_<table2>` with a composite primary key.
 - Current tables: `notes`, `collections`, `tags`, `note_collections`, `note_tags`, `sprints`, `parts`, `course`.
-- RLS is currently disabled repo-wide and no table has a `user_id` column — intentional single-user/no-auth phase per `docs/product-vision.md`, schema deliberately left ready for a later `user_id` + RLS pass. Don't add either speculatively.
+- RLS is enabled on every table, each scoped by a `user_id uuid references auth.users(id) on delete cascade default auth.uid()` column (see `supabase/migrations/20260818075559_add_user_ownership_and_rls.sql`). Policies follow `to authenticated using ((select auth.uid()) = user_id)` (plus matching `with check` on insert/update); `note_tags` has no `user_id` of its own and checks ownership through the `notes`/`tags` rows it links instead. `course`'s primary key is `user_id` itself (one row per user) rather than the old boolean singleton. New tables holding user data must follow this same pattern — RLS is not optional or deferred anymore.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

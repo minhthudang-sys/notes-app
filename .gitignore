@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code (local-only; .claude/skills/ is committed)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
