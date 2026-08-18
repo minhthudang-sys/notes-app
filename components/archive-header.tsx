@@ -6,9 +6,13 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const AREAS = [
-  { href: "/tracker", label: "Archive", hint: "Sprints & chapters" },
-  { href: "/tracker/dashboard", label: "Dashboard", hint: "Progress & timeline" },
-  { href: "/notes", label: "Index", hint: "All notes" },
+  { href: "/workspace/tracker", label: "Archive", hint: "Sprints & chapters" },
+  {
+    href: "/workspace/tracker/dashboard",
+    label: "Dashboard",
+    hint: "Progress & timeline",
+  },
+  { href: "/workspace/notes", label: "Index", hint: "All notes" },
 ];
 
 /**

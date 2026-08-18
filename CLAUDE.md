@@ -71,11 +71,14 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Auth: Signed-In Pages Must Verify Server-Side
 
-Every signed-in-only page must verify the user's session with the Supabase Auth server before it loads, and redirect to the sign-in page if the user is not signed in. Do not rely on the browser-side session alone.
+Use Supabase Auth for all sign-in and session handling — never build custom auth or store passwords ourselves.
 
-- Do the check server-side using the server client in `lib/supabase/server.ts` (e.g. `supabase.auth.getClaims()`), and `redirect("/auth/login")` on failure. `app/protected/page.tsx` shows the pattern to follow.
-- The root `proxy.ts` / `lib/supabase/proxy.ts` cookie-refresh check is not a substitute — it's a pathname-prefix allowlist (which currently excludes `/notes` and `/tracker` entirely) meant for session cookie housekeeping, not access control.
+Every page under `/workspace` (notes, tracker, dashboard, and any future area) requires a signed-in user, verified server-side, before it loads. Do not rely on the browser-side session alone.
+
+- Do the check server-side using the server client in `lib/supabase/server.ts` (e.g. `supabase.auth.getClaims()`), and `redirect("/login")` on failure. `app/workspace/page.tsx` shows the pattern to follow.
+- The root `proxy.ts` / `lib/supabase/proxy.ts` cookie-refresh check is not a substitute — it's a pathname-prefix allowlist (which currently excludes `/workspace` entirely) meant for session cookie housekeeping, not access control.
 - A `"use client"` page reading `lib/supabase/client.ts`'s browser session isn't sufficient either — that state can be stale or forged; the check must happen server-side before the page's content is sent down.
+- Redirect targets are fixed: sign-in success → `/workspace`; sign-out → `/login`. The sign-in page itself lives at `/login` (not under `/auth`); the other `/auth/*` routes (`sign-up`, `forgot-password`, `update-password`, `callback`, `confirm`, `error`) are unaffected.
 
 ## Supabase Conventions
 

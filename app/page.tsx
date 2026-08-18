@@ -5,13 +5,13 @@ import { folderColorVars } from "@/lib/design/folder-colors";
 
 const ENTRANCES = [
   {
-    href: "/tracker",
+    href: "/workspace/tracker",
     color: "mustard" as const,
     label: "The Archive",
     body: "Sprints as folders, chapters as filed documents. Mark chapters complete, log teach-backs.",
   },
   {
-    href: "/notes",
+    href: "/workspace/notes",
     color: "blue" as const,
     label: "The Index",
     body: "Every note in the archive. Filter by collection, tag, sprint or chapter, or search the full text.",

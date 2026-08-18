@@ -16,7 +16,7 @@ each entry backs a real decision already in the code.
   `proxy.ts`.
 
 - **[`auth.getClaims()` reference](https://supabase.com/docs/reference/javascript/auth-getclaims)**
-  — server-side session verification, used in `app/protected/page.tsx`
+  — server-side session verification, used in `app/workspace/page.tsx`
   and required by the "Auth: Signed-In Pages Must Verify Server-Side"
   rule in `CLAUDE.md`.
 
