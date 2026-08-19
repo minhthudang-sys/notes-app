@@ -46,9 +46,11 @@ export default function RootLayout({
 }>) {
   return (
     /*
-     * One intentional look — dark chrome, warm paper. next-themes was
-     * removed rather than left as a toggle that would invert the paper
-     * surfaces and break the metaphor.
+     * Chrome (dark/light) is toggleable via a `.light` class on <html>,
+     * flipped by components/theme-toggle.tsx. Paper surfaces
+     * (.paper-surface in globals.css) are NOT part of that toggle and
+     * stay warm-paper in both themes. Not next-themes: no persistence,
+     * no inline script, no dynamic rendering — see theme-toggle.tsx.
      */
     <html lang="en">
       <body

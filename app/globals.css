@@ -13,7 +13,9 @@
  * modifiers (e.g. `bg-folder-current/20`).
  *
  * This is a single intentional design — dark chrome, warm paper.
- * There is deliberately no light/dark theme pair.
+ * The chrome half is toggleable light/dark (see the `:root.light`
+ * override below and components/theme-toggle.tsx); paper stays
+ * warm-paper in both themes on purpose.
  */
 @layer base {
   :root {
@@ -76,6 +78,41 @@
     --border: var(--archive-rule);
     --input: 30 5% 28%;
     --ring: 41 52% 55%;
+  }
+
+  /*
+   * Light chrome override. Applied via a `.light` class on <html>
+   * (components/theme-toggle.tsx). Only the archive chrome + shadcn
+   * contract tokens are overridden here — paper tokens below stay
+   * the same warm-paper look in both themes on purpose.
+   */
+  :root.light {
+    --archive: 40 20% 95%;
+    --archive-deep: 36 14% 90%;
+    --archive-raised: 40 25% 99%;
+    --archive-rule: 36 10% 80%;
+    --archive-dim: 30 8% 42%;
+    --archive-bright: 30 12% 14%;
+
+    --background: var(--archive);
+    --foreground: var(--archive-bright);
+    --card: var(--archive-raised);
+    --card-foreground: var(--archive-bright);
+    --popover: var(--archive-raised);
+    --popover-foreground: var(--archive-bright);
+    --primary: 30 12% 14%;
+    --primary-foreground: 40 34% 94%;
+    --secondary: 36 10% 88%;
+    --secondary-foreground: 30 12% 14%;
+    --muted: 36 10% 90%;
+    --muted-foreground: var(--archive-dim);
+    --accent: 36 12% 86%;
+    --accent-foreground: 30 12% 14%;
+    --destructive: 6 42% 40%;
+    --destructive-foreground: 40 34% 94%;
+    --border: var(--archive-rule);
+    --input: 36 10% 84%;
+    --ring: 41 55% 38%;
   }
 }
 
