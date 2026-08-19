@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const AREAS = [
   { href: "/workspace/tracker", label: "Archive", hint: "Sprints & chapters" },
@@ -67,9 +68,12 @@ export function ArchiveHeader({ authSlot }: { authSlot: React.ReactNode }) {
           })}
         </nav>
 
-        {!suppressAuthSlot && (
-          <div className="ml-auto flex items-center">{authSlot}</div>
-        )}
+        {/* Theme toggle is global (unlike authSlot above, it's not
+            suppressed on /login or /auth/* — it's useful everywhere). */}
+        <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
+          {!suppressAuthSlot && authSlot}
+        </div>
       </div>
     </header>
   );
